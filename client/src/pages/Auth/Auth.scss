@@ -1,0 +1,10 @@
+.background {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 100vh;
+    background-size: cover;
+    background-position: center;
+    transition: all 0.5s;
+    background-repeat: no-repeat;
+}

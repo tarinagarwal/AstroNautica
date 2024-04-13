@@ -1,0 +1,36 @@
+body {
+  background-color: #000;
+  color: #fff;
+
+}
+
+
+.heading{
+  text-align: center;
+  text-decoration: underline;
+}
+
+
+/* Override some react Slick style */
+
+.slick-prev {
+  left: 10px !important;
+  z-index: 1;
+}
+
+.slick-next {
+  right: 16px !important;
+  z-index: 1;
+}
+
+.slick-prev::before {
+  color: #fff !important;
+  font-weight: bold;
+  font-size: 30px !important;
+}
+
+.slick-next::before {
+  color: #fff !important;
+  font-weight: bold;
+  font-size: 30px !important;
+}
