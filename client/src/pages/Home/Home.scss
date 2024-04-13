@@ -1,57 +1,98 @@
 #background-video {
-    width: 100%;
-    height: 100vh;
-    object-fit: cover;
-    position: absolute;
-    left: 0;
-    z-index: -1;
+  width: 100%;
+  height: 100vh;
+  object-fit: cover;
+  position: absolute;
+  left: 0;
+  z-index: -1;
 }
 
 .hero_section {
-    width: 100%;
-    height: 100vh;
-    object-fit: cover;
-    position: relative;
-    z-index: -1;
+  width: 100%;
+  height: 100vh;
+  object-fit: cover;
+  position: relative;
+  z-index: -1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
 }
 
+.heading {
+  padding: 10px 10px 10px 10px;
+  margin: 50px;
+}
+.apod_info {
+  padding: 20px 0px 20px 0px;
+}
+.author_info {
+  padding: 20px 0px 20px 0px;
+}
 
 .image img {
-    width: 100%;
-    margin: auto;
-    height: 50vh;
-    object-fit: cover;
+  width: 100%;
+  margin: auto;
+  height: 50vh;
+  object-fit: cover;
+}
+
+.big-text {
+  padding-top: 3rem;
+  font-size: 3.5rem;
+  text-align: center;
+}
+.apod_Container {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  border: 0.1px solid rgb(218, 141, 240);
+  border-radius: 0.5rem;
+  box-shadow: 7px 7px 4px rgb(234, 197, 245);
+  width: 90%;
+  margin: auto;
+
+  img {
+    width: 50%;
+    height: 40vw;
+    object-fit: contain;
   }
 
-.apod_Container{
+  .apod_info {
+    span {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
     display: flex;
-    gap: 1rem;
-    padding: 1rem;
-    border: 0.1px solid rgb(218, 141, 240);
-    border-radius: 0.5rem;
-    box-shadow: 7px 7px 4px rgb(234, 197, 245);
-    width: 90%;
-    margin: auto;
+    flex-direction: column;
+    justify-content: center;
+  }
 
-    img{
-        width: 50%;
-        height: 40vw;
-        object-fit: contain;
-    }
+  .author_info {
+    display: flex;
+    justify-content: space-between;
+  }
+}
 
-    .apod_info{
-        span{
-            display: flex;
-            gap: 0.5rem;
-            align-items: center;
-        }
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-    }
+#search {
+  width: 100%;
+  height: 1.563rem;
+  background-color: transparent;
+  border: none;
+  outline: none;
+  border: 0.125rem solid rgba(97, 239, 255, 1);
+  border-radius: 2.5rem;
+  font-size: 1.25rem;
+  color: #61efff;
+  padding: 1.25rem 2.813rem 1.25rem 1.25rem;
+  margin: 1.5rem;
+}
 
-    .author_info{
-        display: flex;
-        justify-content: space-between;
-    }
+.small-text {
+  font-size: 1.25rem;
+  text-align: center;
+  width: 50%;
+  margin-top: 2.5rem;
+  padding: 1rem 0 2rem 0;
 }
