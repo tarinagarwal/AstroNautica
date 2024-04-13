@@ -1,0 +1,46 @@
+
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.1rem 0.5rem;
+    align-items: center;
+    background-color: rgba(12, 12, 12, 0.9);
+}
+
+.logo{
+    display: flex;
+    align-items: center;
+
+}
+
+.logo img{
+    width: 15%;
+}
+
+.nav_Container{
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.nav_links{
+    display: flex;
+    gap: 2rem;
+  
+}
+
+.nav_links li{
+    list-style: none;
+}
+
+.nav_links a{
+    text-decoration: none;
+    font-size: 1.15rem;
+    color:#fff;
+}
+
+.authBtn{
+    display: flex;
+    align-items: center;
+}
