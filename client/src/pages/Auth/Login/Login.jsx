@@ -1,8 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import '../Auth.scss'
+import { Bounce, ToastContainer, toast } from 'react-toastify';
+import API_BASE_URL from '../../../config/config';
+import axios from 'axios';
+import { Link, useNavigate } from 'react-router-dom';
 
 const Login = () => {
 
+  const navigate = useNavigate();
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const imagesWithText = [
@@ -23,20 +28,69 @@ const Login = () => {
     return () => clearInterval(interval);
   }, []);
 
+
+  const [credential,setcredential]=useState({email:"", password:""})
+
+  const handlechange=(e)=>{
+    setcredential({...credential,[e.target.name]:e.target.value})
+  }
+
+  const handlesubmit = async (e)=> {
+    e.preventDefault();
+    const response = await axios.post(`${API_BASE_URL}/v1/auth/login`, credential);
+    
+    if(response.data.status === 'failed'){
+      toast.error(response.data.message, {
+        position: "top-left",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "dark",
+        transition: Bounce,
+        });
+    }
+    else{
+      toast.success(response.data.message, {
+        position: "top-left",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "light",
+        transition: Bounce,
+        });
+
+        setTimeout(() => {
+          navigate('/');
+        }, 4000);
+
+        
+    }
+
+  }
+
   return (
     <>
       <div class="background" style={{backgroundImage: `url(${imagesWithText[currentIndex].url})`}}>
       <p class="backgroundText" className="background-text" >{imagesWithText[currentIndex].text}</p>
     <div className="wrapper">
-      <form action="">
+      <form onSubmit={handlesubmit}>
         <h1>Login</h1>
         <div class="input-box">
-          <input type="text" placeholder="Username" required />
+          <input type="email" name='email' value={credential.email} onChange={handlechange} placeholder="email" required />
           <i class="bx bxs-user"></i>
         </div>
         <div class="input-box">
           <input
           type="password"
+          name='password'
+          value={credential.password}
+          onChange={handlechange}
           placeholder="password"
           id="password"
           required
@@ -46,20 +100,16 @@ const Login = () => {
 
         <div class="remember-forgot">
           <label for=""><input type="checkbox" />Remember me</label>
-          <a href="password.html">Forgot password?</a>
+          <Link to='/resetPassword'>Forgot password?</Link>
         </div>
-
-        <span class="btn">
-          <img src="cosmo.png" alt="" class="cosmo" />
-          <span class="front">Login 🚀</span>
-          <span class="back"></span>
-        </span>
+        <button type='submit'>Login 🚀</button>
         <div class="register-link">
-          <p>Don't have an account? <a href="register.html">Register</a></p>
+          <p>Don't have an account? <Link to = "/signup">Register</Link></p>
         </div>
       </form>
     </div>
   </div>
+  <ToastContainer />
     </>
   )
 }

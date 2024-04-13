@@ -1,10 +1,12 @@
 import React, { useState } from "react";
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useNavigate } from "react-router-dom";
 import styles from "./Navbar.module.scss";
 
 import logo from "../../assests/logo.png";
 
 const Navbar = () => {
+
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
 
   const toggleNavbar = () => {
@@ -56,8 +58,8 @@ const Navbar = () => {
           </ul>
 
           <div className={styles.authBtn}>
-          <button>Login</button>
-          <button>Signup</button>
+          <button onClick={()=>navigate('/login')}>Login</button>
+          <button onClick={()=>navigate('/signup')}>Signup</button>
         </div>
         
         </div>
