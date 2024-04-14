@@ -54,8 +54,8 @@ const Home = () => {
         <div class="searchbar">
           <input type="text" name="" id="search" placeholder="Search here" />
         </div>
-        <h1 class="big-text">Astrophotographer</h1>
-        <p class="small-text">
+        <h1 class="big-text text-light font-weight-bold">Astrophotographer</h1>
+        <p class="small-text text-light font-weight-normal">
           Embark on a cosmic journey through captivating images. Our
           astrophotography showcases the beauty of the universe, capturing
           celestial wonders in breathtaking detail. Explore distant galaxies,
@@ -63,7 +63,9 @@ const Home = () => {
           photographers. Let the cosmos inspire and awe you.
         </p>
       </div>
-      <h1 className="heading">Some Astronomy Picture </h1>
+      <h1 className="heading text-light font-weight-bold">
+        Some Astronomy Picture{" "}
+      </h1>
 
       <div className="picture_slider">
         <Slider {...settings}>
@@ -75,9 +77,11 @@ const Home = () => {
         </Slider>
       </div>
 
-      <h1 className="heading">Astronomy Picture of Day</h1>
+      <h1 className="heading text-light font-weight-bold">
+        Astronomy Picture of Day
+      </h1>
 
-      <div className="apod_Container">
+      <div className="apod_Container text-light font-weight-normal">
         <img src={apodData.hdurl} alt="apod" />
         <div className="apod_info">
           <h2>{apodData.title}</h2>

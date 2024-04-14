@@ -4,7 +4,7 @@ import styles from "./Navbar.module.scss";
 
 import logo from "../../assests/logo.png";
 import { useDispatch, useSelector } from "react-redux";
-import { FaRegUser, FaRegUserCircle} from "react-icons/fa";
+import { FaRegUser, FaRegUserCircle } from "react-icons/fa";
 import { MdLogout } from "react-icons/md";
 import { logoutUser } from "../../store/authSlice";
 
@@ -20,12 +20,9 @@ const Navbar = () => {
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
   const user = useSelector((state) => state.auth.user);
 
-
-   
-  
   const handleLogout = () => {
-      dispatch(logoutUser());
-     navigate('/')  
+    dispatch(logoutUser());
+    navigate("/");
   };
 
   return (
@@ -33,7 +30,7 @@ const Navbar = () => {
       <div class={styles.navbar}>
         <div class={styles.logo}>
           <img src={logo} alt="Website logo" />
-          <h1>AstroNautica</h1>
+          <h1 className="text-light font-weight-bold">AstroNautica</h1>
         </div>
         <div class={styles.nav_Container}>
           <ul className={styles.nav_links}>
@@ -72,17 +69,20 @@ const Navbar = () => {
 
           <div className={styles.authBtn}>
             {isAuthenticated ? (
-               <div>
-               <FaRegUserCircle size={20}/> 
-               <div class="dropdown">
-                {user.username}
-                 <div class="dropdown-content">
-                   <NavLink to="/profile"><FaRegUser/> My profile</NavLink>
-                   <NavLink onClick={handleLogout}><MdLogout/> Logout</NavLink>
-                 </div>
-               </div>
-             </div>
-              
+              <div>
+                <FaRegUserCircle size={20} />
+                <div class="dropdown">
+                  {user.username}
+                  <div class="dropdown-content">
+                    <NavLink to="/profile">
+                      <FaRegUser /> My profile
+                    </NavLink>
+                    <NavLink onClick={handleLogout}>
+                      <MdLogout /> Logout
+                    </NavLink>
+                  </div>
+                </div>
+              </div>
             ) : (
               <>
                 <button onClick={() => navigate("/login")}>Login</button>

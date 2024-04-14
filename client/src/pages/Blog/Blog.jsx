@@ -13,33 +13,28 @@ const Blog = () => {
 
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
 
-  const [posts,setPosts] = useState([]);
+  const [posts, setPosts] = useState([]);
   useEffect(() => {
-
-    const getBlogPost = async() => {
-
+    const getBlogPost = async () => {
       const posts = await axios.get(`${API_BASE_URL}/v1/blog/post`);
       setPosts(posts.data);
+    };
 
-    }
-   
     getBlogPost();
   }, []);
 
   return (
     <>
-      <h1 classname="heading">Blog Posts</h1>
+      <h1 classname="heading text-light font-weight-bold">Blog Posts</h1>
       {isAuthenticated ? (
-        <button onClick={()=>navigate('/addBlog')} className="addBtn">
+        <button onClick={() => navigate("/addBlog")} className="addBtn">
           <BiPlus size={30} /> Add Blog
         </button>
       ) : (
         ""
       )}
 
-      {posts.length > 0 && posts.map(post => (
-        <PostCard {...post} />
-      ))}
+      {posts.length > 0 && posts.map((post) => <PostCard {...post} />)}
     </>
   );
 };
