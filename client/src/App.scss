@@ -70,3 +70,24 @@ body {
 .dropdown:hover .dropdown-content {
   display: block;
 }
+
+/* Overiding Some quill Css */
+
+.editor-container {
+  margin-top: 5px;
+  border: 1px solid black;
+  border-radius: 5px;
+  z-index: -1;
+ 
+}
+
+.ql-container.ql-snow {
+  height: 260px;
+  overflow: auto;
+}
+
+
+
+.ql-tooltip {
+  left: unset !important;
+}

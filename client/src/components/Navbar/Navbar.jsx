@@ -47,8 +47,8 @@ const Navbar = () => {
 
             <Link>
               <li>
-                <Link to="/" onClick={toggleNavbar}>
-                  News
+                <Link to="/blog" onClick={toggleNavbar}>
+                  Space Blog
                 </Link>
               </li>
             </Link>
