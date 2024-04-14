@@ -43,7 +43,8 @@ Wait for the project to load.
 
 ->For Backend
 1. Do the above steps.
-2. Set up the following environment variables
+2. Set up the following environment variables:
+
 DATABASE_CONNECTION_STRING=""
 SECRET_KEY=''
 CROSS_ORIGIN_URL='http://localhost:3000'
