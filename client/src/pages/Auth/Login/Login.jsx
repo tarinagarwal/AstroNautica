@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import '../Auth.scss'
 import { Bounce, ToastContainer, toast } from 'react-toastify';
-import API_BASE_URL from '../../../config/config';
-import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { loginUser } from '../../../store/authSlice';
 
 const Login = () => {
 
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const imagesWithText = [
@@ -35,44 +36,53 @@ const Login = () => {
     setcredential({...credential,[e.target.name]:e.target.value})
   }
 
+
   const handlesubmit = async (e)=> {
     e.preventDefault();
-    const response = await axios.post(`${API_BASE_URL}/v1/auth/login`, credential);
-    
-    if(response.data.status === 'failed'){
-      toast.error(response.data.message, {
-        position: "top-left",
-        autoClose: 5000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        progress: undefined,
-        theme: "dark",
-        transition: Bounce,
-        });
-    }
-    else{
-      toast.success(response.data.message, {
-        position: "top-left",
-        autoClose: 5000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        progress: undefined,
-        theme: "light",
-        transition: Bounce,
-        });
-
-        setTimeout(() => {
-          navigate('/');
-        }, 4000);
-
-        
-    }
-
+    dispatch(loginUser(credential));
   }
+
+  const error = useSelector((state) => state.auth.error);
+  const user = useSelector((state) => state.auth.user);
+  const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
+
+
+  useEffect(()=>{
+    if(isAuthenticated){
+      navigate('/')
+    }
+
+  },[isAuthenticated])
+
+
+  useEffect(() => {
+    if (error && error.status === 'failed') {
+      toast.error(error.message, {
+        position: 'top-left',
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: 'dark',
+        transition: Bounce,
+      });
+    } else if (user) {
+      toast.success(user.message, {
+        position: "top-left",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "DARK",
+        transition: Bounce,
+      });
+    }
+  }, [error, user]);
+
 
   return (
     <>
@@ -109,7 +119,7 @@ const Login = () => {
       </form>
     </div>
   </div>
-  <ToastContainer />
+  
     </>
   )
 }

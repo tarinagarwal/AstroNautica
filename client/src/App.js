@@ -4,6 +4,8 @@ import Layout from './Layout/Layout';
 import Home from './pages/Home/Home';
 import Login from './pages/Auth/Login/Login';
 import Signup from './pages/Auth/Signup/Signup';
+import { ToastContainer } from 'react-toastify';
+import Profile from './pages/Profile/Profile';
 
 function App() {
   return (
@@ -11,6 +13,7 @@ function App() {
     <Routes>
               <Route path="/" element={<Layout/> }>
                 <Route index element={<Home />} />
+                <Route path='/profile' element={<Profile />} />
             
               </Route>
     </Routes>
@@ -18,6 +21,7 @@ function App() {
                 <Route path='/login' element={<Login />} />
                 <Route path='/signup' element={<Signup />} />
     </Routes>
+    <ToastContainer />
     </>
   );
 }
