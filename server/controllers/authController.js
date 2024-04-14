@@ -159,3 +159,15 @@ export const verifyResetToken=async(req,res)=>{
         }
         })
 }
+
+
+export const logout = async (req,res)=>{
+    console.log('yes')
+    try {
+        res.cookie('token', '', { httpOnly: true, expires: new Date(0) });
+        res.status(200).json({ message: 'Logout successful.', status: 'success'});
+    } catch (error) {
+        console.error('Error logging out:', error);
+        res.status(500).json({ message: 'Internal server error.', status: 'failed' });
+    }
+}
