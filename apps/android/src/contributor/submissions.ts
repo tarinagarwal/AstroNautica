@@ -18,7 +18,13 @@ export function decryptFeedback(f: Feedback, contributorSecretKey: Uint8Array): 
     const key = getConversationKey(contributorSecretKey, f.moderator);
     return { at: f.at, moderator: f.moderator, kind: f.kind, text: decrypt(f.nip44, key) };
   } catch (e) {
-    return { at: f.at, moderator: f.moderator, kind: f.kind, text: null, error: e instanceof Error ? e.message : String(e) };
+    return {
+      at: f.at,
+      moderator: f.moderator,
+      kind: f.kind,
+      text: null,
+      error: e instanceof Error ? e.message : String(e),
+    };
   }
 }
 

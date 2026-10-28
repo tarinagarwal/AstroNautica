@@ -104,7 +104,10 @@ async function blockAt(http: Http, c: ChainConfig, ts: number): Promise<number> 
   let hi = latest;
   while (lo < hi) {
     const mid = Math.floor((lo + hi) / 2);
-    const b = await rpc<{ timestamp: string }>(http, rpcUrls(c), "eth_getBlockByNumber", ["0x" + mid.toString(16), false]);
+    const b = await rpc<{ timestamp: string }>(http, rpcUrls(c), "eth_getBlockByNumber", [
+      "0x" + mid.toString(16),
+      false,
+    ]);
     if (parseInt(b.timestamp, 16) < ts) lo = mid + 1;
     else hi = mid;
   }

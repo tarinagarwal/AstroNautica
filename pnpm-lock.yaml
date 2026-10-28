@@ -126,6 +126,9 @@ importers:
       '@types/jest':
         specifier: ^29.5.13
         version: 29.5.14
+      '@types/libsodium-wrappers':
+        specifier: ^0.7.14
+        version: 0.7.14
       '@types/markdown-it':
         specifier: ^14.1.2
         version: 14.2.0

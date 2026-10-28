@@ -1,4 +1,11 @@
-import { MAX_COMMENT_CHARS, REACTIONS, type CommentNode, type Event, type Reaction, type StoryRef } from "@azaadawaaz/core";
+import {
+  MAX_COMMENT_CHARS,
+  REACTIONS,
+  type CommentNode,
+  type Event,
+  type Reaction,
+  type StoryRef,
+} from "@azaadawaaz/core";
 import React, { useEffect, useMemo, useReducer, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { signerFromSecret as signerOf } from "../../api/nip98";
@@ -85,7 +92,15 @@ function CommentItem({
 }) {
   const { t, date } = useI18n();
   return (
-    <View style={{ marginLeft: depth * space.l, borderLeftWidth: depth ? 2 : 0, borderLeftColor: colors.border, paddingLeft: depth ? space.s : 0, marginBottom: space.m }}>
+    <View
+      style={{
+        marginLeft: depth * space.l,
+        borderLeftWidth: depth ? 2 : 0,
+        borderLeftColor: colors.border,
+        paddingLeft: depth ? space.s : 0,
+        marginBottom: space.m,
+      }}
+    >
       <Txt muted size={12}>
         {node.event.pubkey.slice(0, 8)}… · {date(node.event.created_at, true)}
       </Txt>
@@ -140,13 +155,33 @@ export function Comments({ story }: { story: StoryRef }) {
   const moderator = isActiveModerator
     ? {
         hide: (e: Event) =>
-          void hideComment(app, services.api().withSigner(signerOf(mod.keys.secretKey)), mod.keys.secretKey, mod.keys.pubkey, e.id).then(
-            (r) => Alert.alert(t("moderate.done"), r.auditError ? t("moderate.auditPending", { error: r.auditError }) : undefined),
+          void hideComment(
+            app,
+            services.api().withSigner(signerOf(mod.keys.secretKey)),
+            mod.keys.secretKey,
+            mod.keys.pubkey,
+            e.id,
+          ).then(
+            (r) =>
+              Alert.alert(
+                t("moderate.done"),
+                r.auditError ? t("moderate.auditPending", { error: r.auditError }) : undefined,
+              ),
             (err) => Alert.alert(t("common.error"), String(err)),
           ),
         mute: (e: Event) =>
-          void muteKey(app, services.api().withSigner(signerOf(mod.keys.secretKey)), mod.keys.secretKey, mod.keys.pubkey, e.pubkey).then(
-            (r) => Alert.alert(t("moderate.done"), r.auditError ? t("moderate.auditPending", { error: r.auditError }) : undefined),
+          void muteKey(
+            app,
+            services.api().withSigner(signerOf(mod.keys.secretKey)),
+            mod.keys.secretKey,
+            mod.keys.pubkey,
+            e.pubkey,
+          ).then(
+            (r) =>
+              Alert.alert(
+                t("moderate.done"),
+                r.auditError ? t("moderate.auditPending", { error: r.auditError }) : undefined,
+              ),
             (err) => Alert.alert(t("common.error"), String(err)),
           ),
       }
@@ -163,11 +198,19 @@ export function Comments({ story }: { story: StoryRef }) {
         <View style={{ marginTop: space.m }}>
           {parent ? (
             <Row>
-              <Txt muted size={13}>{t("comments.replyingTo", { id: parent.pubkey.slice(0, 8) })}</Txt>
+              <Txt muted size={13}>
+                {t("comments.replyingTo", { id: parent.pubkey.slice(0, 8) })}
+              </Txt>
               <Button small kind="link" title={t("common.cancel")} onPress={() => setParent(undefined)} />
             </Row>
           ) : null}
-          <Field label={t("comments.placeholder")} value={text} onChangeText={setText} multiline maxLength={MAX_COMMENT_CHARS * 2} />
+          <Field
+            label={t("comments.placeholder")}
+            value={text}
+            onChangeText={setText}
+            multiline
+            maxLength={MAX_COMMENT_CHARS * 2}
+          />
           <Row>
             <Txt muted size={13} style={{ flex: 1, color: chars > MAX_COMMENT_CHARS ? colors.bad : colors.muted }}>
               {t("comments.chars", { count: chars, max: MAX_COMMENT_CHARS })}
@@ -186,4 +229,3 @@ export function Comments({ story }: { story: StoryRef }) {
     </Section>
   );
 }
-

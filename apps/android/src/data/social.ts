@@ -45,7 +45,9 @@ export class StorySocial {
 
   async load(): Promise<void> {
     const relays = this.app.relayUrls();
-    const results = await Promise.all(this.filters().map((f) => this.app.pool.query(relays, f).catch(() => [] as Event[])));
+    const results = await Promise.all(
+      this.filters().map((f) => this.app.pool.query(relays, f).catch(() => [] as Event[])),
+    );
     for (const e of results.flat()) this.events.set(e.id, e);
   }
 

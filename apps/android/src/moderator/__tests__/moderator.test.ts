@@ -28,7 +28,17 @@ import { MemoryPool, NOW, contributor, modA, owner, ownerLists, publisher } from
 import { concatBytes } from "../../util/bytes";
 import { changeList, hideComment, muteKey, syncContributors, unlistStory } from "../actions";
 import { previewMedia, PreviewIntegrityError } from "../preview";
-import { approve, bodyProblems, claim, identityFrom, openSubmission, publisherKey, rejectSubmission, requestChanges, rewrapPending } from "../review";
+import {
+  approve,
+  bodyProblems,
+  claim,
+  identityFrom,
+  openSubmission,
+  publisherKey,
+  rejectSubmission,
+  requestChanges,
+  rewrapPending,
+} from "../review";
 
 const API = "https://api.example";
 let modX: EncryptionKeyPair;
@@ -49,7 +59,10 @@ function body(): ApprovalBody {
     summary: { en: "Summary" },
     tags: [],
     contributor: { pubkey: contributor.npub, displayName: "Pen" },
-    blocks: [{ type: "text", markdown: { en: "Text" } }, { type: "image", items: [{ sha256: imageSha }] }],
+    blocks: [
+      { type: "text", markdown: { en: "Text" } },
+      { type: "image", items: [{ sha256: imageSha }] },
+    ],
   };
 }
 const storyId = uuidv7();
@@ -72,7 +85,16 @@ async function server() {
     state: "submitted",
     bodyCiphertext: await encryptJson(body(), key),
     wrappedKey: await wrapKey(key, modX.publicKey),
-    media: [{ sha256: imageSha, size: image.length, mime: "image/jpeg", kind: "image", chunks: blob.chunks.length, complete: true }],
+    media: [
+      {
+        sha256: imageSha,
+        size: image.length,
+        mime: "image/jpeg",
+        kind: "image",
+        chunks: blob.chunks.length,
+        complete: true,
+      },
+    ],
   };
   const calls: { path: string; body: any }[] = [];
   const http = fakeHttp((req) => {
@@ -81,12 +103,28 @@ async function server() {
     const u = new URL(req.url);
     const b = req.body?.length ? JSON.parse(new TextDecoder().decode(req.body)) : undefined;
     calls.push({ path: u.pathname, body: b });
-    if (u.pathname === `/submissions/${detail.id}`) return { body: JSON.stringify(u.searchParams.get("x25519") === modX.publicKey ? detail : { ...detail, wrappedKey: null }) };
+    if (u.pathname === `/submissions/${detail.id}`)
+      return {
+        body: JSON.stringify(
+          u.searchParams.get("x25519") === modX.publicKey ? detail : { ...detail, wrappedKey: null },
+        ),
+      };
     if (u.pathname.endsWith("/header")) return { body: blob.header };
     const m = u.pathname.match(/\/chunks\/(\d+)$/);
     if (m) return { body: blob.chunks[Number(m[1])]! };
-    if (u.pathname === "/rewrap-needed") return { body: JSON.stringify([{ id: detail.id, missing: [newModX.publicKey, "99".repeat(32)], wrappedKey: detail.wrappedKey }]) };
-    if (u.pathname === "/contributors") return { body: JSON.stringify([{ pubkey: contributor.pubkey, redeemedAt: "", revokedAt: null }, { pubkey: owner.pubkey, redeemedAt: "", revokedAt: "x" }]) };
+    if (u.pathname === "/rewrap-needed")
+      return {
+        body: JSON.stringify([
+          { id: detail.id, missing: [newModX.publicKey, "99".repeat(32)], wrappedKey: detail.wrappedKey },
+        ]),
+      };
+    if (u.pathname === "/contributors")
+      return {
+        body: JSON.stringify([
+          { pubkey: contributor.pubkey, redeemedAt: "", revokedAt: null },
+          { pubkey: owner.pubkey, redeemedAt: "", revokedAt: "x" },
+        ]),
+      };
     if (u.pathname.endsWith("/keys")) return { body: JSON.stringify({ added: Object.keys(b.wrappedKeys) }) };
     return { body: JSON.stringify({ ok: true }) };
   });
@@ -95,7 +133,12 @@ async function server() {
 
 const lists = () =>
   buildEffectiveLists(owner.pubkey, [
-    createListEvent("service-keys", [{ role: "publisher", pubkey: publisher.pubkey, x25519: pubX?.publicKey ?? "55".repeat(32), from: NOW - 1000 }], owner.secretKey, NOW - 10),
+    createListEvent(
+      "service-keys",
+      [{ role: "publisher", pubkey: publisher.pubkey, x25519: pubX?.publicKey ?? "55".repeat(32), from: NOW - 1000 }],
+      owner.secretKey,
+      NOW - 10,
+    ),
   ]);
 
 describe("moderator review", () => {
@@ -106,14 +149,20 @@ describe("moderator review", () => {
     expect(opened.body).toEqual(body());
     expect(opened.problems).toEqual([]);
     const other = await generateEncryptionKeyPair();
-    await expect(openSubmission(api, "11111111-1111-4111-8111-111111111111", identityFrom(modA.secretKey, other))).rejects.toThrow(/no key wrapped/);
+    await expect(
+      openSubmission(api, "11111111-1111-4111-8111-111111111111", identityFrom(modA.secretKey, other)),
+    ).rejects.toThrow(/no key wrapped/);
   });
 
   it("spots a body that doesn't match the submission", async () => {
     const { detail } = await server();
     expect(bodyProblems({ ...body(), id: uuidv7() }, detail)).toContain("story id differs from the submission");
-    expect(bodyProblems({ ...body(), contributor: { pubkey: hexToNpub(owner.pubkey), displayName: "x" } }, detail)).toContain("contributor key differs from the submitter");
-    expect(bodyProblems({ ...body(), blocks: [{ type: "image", items: [{ sha256: "e".repeat(64) }] }] }, detail)[0]).toMatch(/was not uploaded/);
+    expect(
+      bodyProblems({ ...body(), contributor: { pubkey: hexToNpub(owner.pubkey), displayName: "x" } }, detail),
+    ).toContain("contributor key differs from the submitter");
+    expect(
+      bodyProblems({ ...body(), blocks: [{ type: "image", items: [{ sha256: "e".repeat(64) }] }] }, detail)[0],
+    ).toMatch(/was not uploaded/);
   });
 
   it("approves: signs the approval body, re-wraps for the publisher only, sends a signed audit event", async () => {
@@ -127,12 +176,20 @@ describe("moderator review", () => {
     expect(approvalMessageHash(sent.approvalBodySha256, approval.approvedAt)).toMatch(/^[0-9a-f]{64}$/);
     expect(await unwrapKey(sent.publisherWrappedKey, pubX)).toEqual(key);
     expect(sent.auditEvent.kind).toBe(KIND_AUDIT);
-    expect(sent.auditEvent.tags).toEqual(expect.arrayContaining([["action", "approve"], ["s", sha256Hex(opened.detail.id)], ["story", storyId]]));
+    expect(sent.auditEvent.tags).toEqual(
+      expect.arrayContaining([
+        ["action", "approve"],
+        ["s", sha256Hex(opened.detail.id)],
+        ["story", storyId],
+      ]),
+    );
     await expect(approve(api, { ...opened, problems: ["x"] }, me, lists())).rejects.toThrow(/cannot approve/);
   });
 
   it("refuses a server that names a different publisher", () => {
-    expect(() => publisherKey(lists(), { publisher: { pubkey: modA.pubkey, x25519: "00".repeat(32) } } as never)).toThrow(/publisher/);
+    expect(() =>
+      publisherKey(lists(), { publisher: { pubkey: modA.pubkey, x25519: "00".repeat(32) } } as never),
+    ).toThrow(/publisher/);
     expect(() => publisherKey(buildEffectiveLists(owner.pubkey, []))).toThrow(/no publisher/);
   });
 
@@ -143,9 +200,15 @@ describe("moderator review", () => {
     await requestChanges(api, detail, me, "Blur faces");
     await claim(api, detail.id, me);
     const rej = calls.find((c) => c.path.endsWith("/reject"))!.body;
-    expect(decryptFeedback({ at: "", moderator: modA.pubkey, kind: "reject", nip44: rej.feedback }, contributor.secretKey).text).toBe("Off topic");
+    expect(
+      decryptFeedback({ at: "", moderator: modA.pubkey, kind: "reject", nip44: rej.feedback }, contributor.secretKey)
+        .text,
+    ).toBe("Off topic");
     expect(rej.auditEvent.tags.some((t: string[]) => t[0] === "story")).toBe(false);
-    expect(calls.find((c) => c.path.endsWith("/request-changes"))!.body.auditEvent.tags).toContainEqual(["action", "request_changes"]);
+    expect(calls.find((c) => c.path.endsWith("/request-changes"))!.body.auditEvent.tags).toContainEqual([
+      "action",
+      "request_changes",
+    ]);
     expect(calls.find((c) => c.path.endsWith("/claim"))!.body.auditEvent.tags).toContainEqual(["action", "claim"]);
     await expect(rejectSubmission(api, detail, me, " ")).rejects.toThrow(/reason/);
   });
@@ -163,10 +226,26 @@ describe("moderator review", () => {
     const { api, http, detail, key } = await server();
     const fs = nodeFs();
     const signer = signerFromSecret(modA.secretKey);
-    const args = { api, http, fs, signer, decryptor: { decryptChunks: async () => ({ sha256: "", size: 0 }) }, submissionId: detail.id, media: detail.media[0]!, contentKey: key, workDir: joinPath(fs.paths.cache, "r") };
+    const args = {
+      api,
+      http,
+      fs,
+      signer,
+      decryptor: { decryptChunks: async () => ({ sha256: "", size: 0 }) },
+      submissionId: detail.id,
+      media: detail.media[0]!,
+      contentKey: key,
+      workDir: joinPath(fs.paths.cache, "r"),
+    };
     const path = await previewMedia(args);
     expect(concatBytes([await fs.readBytes(path)])).toEqual(image);
-    await expect(previewMedia({ ...args, media: { ...detail.media[0]!, sha256: "f".repeat(64) }, workDir: joinPath(fs.paths.cache, "r2") })).rejects.toBeInstanceOf(PreviewIntegrityError);
+    await expect(
+      previewMedia({
+        ...args,
+        media: { ...detail.media[0]!, sha256: "f".repeat(64) },
+        workDir: joinPath(fs.paths.cache, "r2"),
+      }),
+    ).rejects.toBeInstanceOf(PreviewIntegrityError);
   });
 });
 
@@ -174,7 +253,13 @@ describe("moderator list actions", () => {
   function app() {
     const fs = nodeFs();
     const pool = new MemoryPool(ownerLists());
-    const a = new AppData(normalizeConfig({ ownerPubkey: owner.pubkey, bootstrapRelays: ["wss://r.example"] }), pool, new GatewayClient(fakeHttp(() => ({ status: 404 }))), new JsonStore(fs, "d"), fs);
+    const a = new AppData(
+      normalizeConfig({ ownerPubkey: owner.pubkey, bootstrapRelays: ["wss://r.example"] }),
+      pool,
+      new GatewayClient(fakeHttp(() => ({ status: 404 }))),
+      new JsonStore(fs, "d"),
+      fs,
+    );
     return { a, pool };
   }
 
@@ -190,10 +275,15 @@ describe("moderator list actions", () => {
     const u = await unlistStory(a, api, modA.secretKey, modA.pubkey, storyId);
     expect(u.relays.every((r) => r.ok)).toBe(true);
     expect(a.lists!.unlisted.has(storyId)).toBe(true);
-    expect(calls.find((c) => c.path === "/moderation/audit")!.body.auditEvent.tags).toContainEqual(["e", "c".repeat(64)]);
+    expect(calls.find((c) => c.path === "/moderation/audit")!.body.auditEvent.tags).toContainEqual([
+      "e",
+      "c".repeat(64),
+    ]);
     expect(calls.find((c) => c.path === "/moderation/unlist")!.body.storyId).toBe(storyId);
     // each change is a newer replaceable event even within the same second
-    const ev = [...pool.events.values()].filter((e) => e.pubkey === modA.pubkey && e.tags[0]![1] === "azaad:list:hidden");
+    const ev = [...pool.events.values()].filter(
+      (e) => e.pubkey === modA.pubkey && e.tags[0]![1] === "azaad:list:hidden",
+    );
     expect(ev).toHaveLength(1);
     const again = await changeList(a, modA.secretKey, modA.pubkey, "hidden", [{ op: "remove", value: "c".repeat(64) }]);
     expect(again.event.created_at).toBeGreaterThan(ev[0]!.created_at - 1);
@@ -214,7 +304,10 @@ describe("moderator list actions", () => {
     const { a } = app();
     await a.refresh();
     const { api } = await server();
-    expect(await syncContributors(a, api, modA.secretKey, modA.pubkey)).toEqual({ added: [contributor.pubkey], revoked: [owner.pubkey] });
+    expect(await syncContributors(a, api, modA.secretKey, modA.pubkey)).toEqual({
+      added: [contributor.pubkey],
+      revoked: [owner.pubkey],
+    });
     expect(a.lists!.contributors.has(contributor.pubkey)).toBe(true);
     expect(await syncContributors(a, api, modA.secretKey, modA.pubkey)).toEqual({ added: [], revoked: [] });
     a.unwatch();

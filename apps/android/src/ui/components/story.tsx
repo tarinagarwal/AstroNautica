@@ -42,13 +42,19 @@ function EmbeddedStory({ storyId, version }: { storyId: string; version?: number
   const [ref, setRef] = useState<StoryRef | null | undefined>(undefined);
   useEffect(() => {
     let live = true;
-    app.getStory(storyId).then((r) => live && setRef(r?.ref ?? null), () => live && setRef(null));
+    app.getStory(storyId).then(
+      (r) => live && setRef(r?.ref ?? null),
+      () => live && setRef(null),
+    );
     return () => {
       live = false;
     };
   }, [app, storyId]);
   return (
-    <Card onPress={ref ? () => nav.push({ name: "story", storyId }) : undefined} style={{ borderColor: colors.primary }}>
+    <Card
+      onPress={ref ? () => nav.push({ name: "story", storyId }) : undefined}
+      style={{ borderColor: colors.primary }}
+    >
       <Txt muted size={13}>
         {t("embed.label")}
         {version ? ` · ${t("story.version", { version })}` : ""}
@@ -61,7 +67,12 @@ function EmbeddedStory({ storyId, version }: { storyId: string; version?: number
 function BlockView({ block, lang, offline }: { block: Block; lang: Lang; offline?: Map<string, string> }) {
   switch (block.type) {
     case "text":
-      return <Markdown source={pickText(block.markdown, lang)} lang={block.markdown[lang] ? lang : block.markdown.en ? "en" : "hi"} />;
+      return (
+        <Markdown
+          source={pickText(block.markdown, lang)}
+          lang={block.markdown[lang] ? lang : block.markdown.en ? "en" : "hi"}
+        />
+      );
     case "image":
       return (
         <View style={{ marginBottom: space.l }}>
@@ -96,7 +107,12 @@ function BlockView({ block, lang, offline }: { block: Block; lang: Lang; offline
       return (
         <View style={{ marginBottom: space.l }}>
           {block.title ? <Txt bold>{pickText(block.title, lang)}</Txt> : null}
-          <VideoPlayer hls={block.hls} mp4={block.mp4} poster={block.poster} offlinePath={offline?.get(block.mp4.sha256)} />
+          <VideoPlayer
+            hls={block.hls}
+            mp4={block.mp4}
+            poster={block.poster}
+            offlinePath={offline?.get(block.mp4.sha256)}
+          />
           {block.description ? (
             <Txt muted size={14} style={{ marginTop: space.xs }}>
               {pickText(block.description, lang)}
@@ -127,10 +143,13 @@ export function StoryView({ manifest, offline }: { manifest: Manifest; offline?:
         {pickText(manifest.title, lang)}
       </Txt>
       <Txt muted size={14} style={{ marginVertical: space.s }}>
-        {t("story.by", { name: manifest.contributor.displayName })} · {t("story.publishedOn", { date: date(manifest.publishedAt) })}
+        {t("story.by", { name: manifest.contributor.displayName })} ·{" "}
+        {t("story.publishedOn", { date: date(manifest.publishedAt) })}
         {manifest.location ? ` · ${pickText(manifest.location, lang)}` : ""}
       </Txt>
-      {manifest.version > 1 ? <Badge tone="warn" label={t("story.correctedOn", { date: date(manifest.publishedAt) })} /> : null}
+      {manifest.version > 1 ? (
+        <Badge tone="warn" label={t("story.correctedOn", { date: date(manifest.publishedAt) })} />
+      ) : null}
       {manifest.cover ? (
         <View style={{ marginVertical: space.m }}>
           <VerifiedImage item={manifest.cover} />

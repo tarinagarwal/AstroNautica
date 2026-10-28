@@ -54,7 +54,8 @@ export class MediaStore {
   async image(item: Pick<ImageItem, "sha256" | "cid" | "variants"> | Cover, size: ImageSize = "960"): Promise<string> {
     const saved = await this.offlineLookup?.(item.sha256);
     if (saved) return saved;
-    const order: ImageSize[] = size === "480" ? ["480", "960", "1600"] : size === "960" ? ["960", "1600", "480"] : ["1600", "960"];
+    const order: ImageSize[] =
+      size === "480" ? ["480", "960", "1600"] : size === "960" ? ["960", "1600", "480"] : ["1600", "960"];
     const variant = order.map((s) => item.variants?.[s]).find(Boolean);
     if (variant) {
       return this.cached(`cid-${variant}`, () => this.gateways.fetchByCid(variant, 25 * 1024 * 1024)).catch(() =>
@@ -78,7 +79,11 @@ export class MediaStore {
    * Download a large file (the MP4 fallback) by trying each gateway in turn; the native downloader deletes the file
    * and fails if the bytes don't hash to `ref.sha256`. Mismatching gateways are flagged.
    */
-  async video(ref: FileRef, onProgress?: (bytes: number, total: number) => void, signal?: AbortSignal): Promise<string> {
+  async video(
+    ref: FileRef,
+    onProgress?: (bytes: number, total: number) => void,
+    signal?: AbortSignal,
+  ): Promise<string> {
     const offline = await this.offlineLookup?.(ref.sha256);
     if (offline) return offline;
     await (this.ready ??= this.fs.mkdirs(this.dir));

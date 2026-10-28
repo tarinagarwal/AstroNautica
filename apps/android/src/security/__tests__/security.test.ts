@@ -8,7 +8,16 @@ function memoryVault(): VaultBackend {
   let pin: string | null = null;
   let unlocked = true;
   return {
-    state: async () => JSON.stringify({ hasVault: true, lock: pin ? "pin" : "none", biometric: false, biometricAvailable: false, unlocked, failedAttempts: 0, retryAt: 0 }),
+    state: async () =>
+      JSON.stringify({
+        hasVault: true,
+        lock: pin ? "pin" : "none",
+        biometric: false,
+        biometricAvailable: false,
+        unlocked,
+        failedAttempts: 0,
+        retryAt: 0,
+      }),
     write: async (s) => {
       if (!unlocked) throw new Error("locked");
       secrets = s;

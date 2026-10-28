@@ -19,7 +19,14 @@ describe("UTF-8 codecs (Hermes polyfill)", () => {
 
   it("decode like Node's TextDecoder, including invalid input", () => {
     for (const s of samples) expect(new Utf8TextDecoder().decode(new TextEncoder().encode(s))).toBe(s);
-    for (const bad of [[0xff], [0xc0, 0x80], [0xe2, 0x82], [0xed, 0xa0, 0x80], [0xf4, 0x90, 0x80, 0x80], [0x61, 0x80, 0x62]]) {
+    for (const bad of [
+      [0xff],
+      [0xc0, 0x80],
+      [0xe2, 0x82],
+      [0xed, 0xa0, 0x80],
+      [0xf4, 0x90, 0x80, 0x80],
+      [0x61, 0x80, 0x62],
+    ]) {
       const b = Uint8Array.from(bad);
       expect(new Utf8TextDecoder().decode(b)).toBe(new TextDecoder().decode(b));
     }
@@ -30,7 +37,13 @@ describe("UTF-8 codecs (Hermes polyfill)", () => {
 
 describe("structuredClone fallback", () => {
   it("deep-clones manifests and typed arrays", () => {
-    const v = { a: [1, { b: "x" }], d: new Date(5), u: Uint8Array.from([1, 2]), m: new Map([["k", { z: 1 }]]), s: new Set([1]) };
+    const v = {
+      a: [1, { b: "x" }],
+      d: new Date(5),
+      u: Uint8Array.from([1, 2]),
+      m: new Map([["k", { z: 1 }]]),
+      s: new Set([1]),
+    };
     const c = structuredCloneFallback(v);
     expect(c).toEqual(v);
     expect(c.a[1]).not.toBe(v.a[1]);
@@ -64,7 +77,15 @@ describe("base64 fallbacks", () => {
     expect(typeof target.TextDecoder).toBe("function");
     expect(typeof target.structuredClone).toBe("function");
     expect(typeof target.Promise.any).toBe("function");
-    const existing = { TextDecoder: 1, TextEncoder: 2, structuredClone: 3, atob: 4, btoa: 5, AggregateError: 6, Promise };
+    const existing = {
+      TextDecoder: 1,
+      TextEncoder: 2,
+      structuredClone: 3,
+      atob: 4,
+      btoa: 5,
+      AggregateError: 6,
+      Promise,
+    };
     installLanguagePolyfills(existing);
     expect(existing.TextDecoder).toBe(1);
   });

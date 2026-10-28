@@ -16,7 +16,15 @@ import { colors } from "./ui/theme";
 import { ContributeScreen, EditorScreen, InviteScreen } from "./ui/screens/contributor";
 import { ModerateScreen, ReviewScreen } from "./ui/screens/moderator";
 import { ReceiveScreen, SavedScreen, ShareScreen } from "./ui/screens/offline";
-import { AboutScreen, HomeScreen, MenuScreen, ReachScreen, SearchScreen, StoryScreen, TagScreen } from "./ui/screens/reader";
+import {
+  AboutScreen,
+  HomeScreen,
+  MenuScreen,
+  ReachScreen,
+  SearchScreen,
+  StoryScreen,
+  TagScreen,
+} from "./ui/screens/reader";
 import { KeysScreen, LockScreen, PinSetupScreen, SettingsScreen, UpdateScreen } from "./ui/screens/settings";
 
 function CurrentScreen() {

@@ -50,15 +50,36 @@ export function SettingsScreen() {
   return (
     <Screen title={t("nav.settings")}>
       <Section title={t("lang.switch")}>
-        <Choice value={lang} onChange={setLang} options={[{ value: "en", label: t("lang.en") }, { value: "hi", label: t("lang.hi") }]} />
+        <Choice
+          value={lang}
+          onChange={setLang}
+          options={[
+            { value: "en", label: t("lang.en") },
+            { value: "hi", label: t("lang.hi") },
+          ]}
+        />
       </Section>
       <Section title={t("tor.title")}>
-        <Toggle label={t("tor.useTor")} value={net.settings.torEnabled} onChange={(v) => void net.setTor(v)} help={t("tor.help")} />
+        <Toggle
+          label={t("tor.useTor")}
+          value={net.settings.torEnabled}
+          onChange={(v) => void net.setTor(v)}
+          help={t("tor.help")}
+        />
         <Row style={{ marginBottom: space.m }}>
-          <Badge tone={net.tor.state === "on" ? "ok" : net.tor.state === "error" ? "bad" : "neutral"} label={torLabel} />
-          {net.tor.error ? <Txt muted size={13}>{net.tor.error}</Txt> : null}
+          <Badge
+            tone={net.tor.state === "on" ? "ok" : net.tor.state === "error" ? "bad" : "neutral"}
+            label={torLabel}
+          />
+          {net.tor.error ? (
+            <Txt muted size={13}>
+              {net.tor.error}
+            </Txt>
+          ) : null}
         </Row>
-        <Txt muted size={14}>{t("tor.bridges")}</Txt>
+        <Txt muted size={14}>
+          {t("tor.bridges")}
+        </Txt>
         <Choice<Bridges>
           value={net.settings.bridges}
           onChange={(b) => void net.setBridges(b)}
@@ -68,7 +89,12 @@ export function SettingsScreen() {
             { value: "none", label: t("tor.noBridges") },
           ]}
         />
-        <Toggle label={t("tor.auto")} value={net.settings.autoTor} onChange={(v) => void net.setAutoTor(v)} help={t("tor.autoHelp")} />
+        <Toggle
+          label={t("tor.auto")}
+          value={net.settings.autoTor}
+          onChange={(v) => void net.setAutoTor(v)}
+          help={t("tor.autoHelp")}
+        />
         <Button kind="secondary" busy={checking} title={t("net.check")} onPress={() => void check()} />
         {net.reachability ? (
           <Txt muted size={13}>
@@ -86,7 +112,11 @@ export function SettingsScreen() {
         {vault ? (
           <>
             <Txt>{vault.lock === "pin" ? t("lock.on") : t("lock.off")}</Txt>
-            {lockRequired ? <Txt muted size={13}>{t("lock.required")}</Txt> : null}
+            {lockRequired ? (
+              <Txt muted size={13}>
+                {t("lock.required")}
+              </Txt>
+            ) : null}
             {vault.lock === "none" ? (
               <Button title={t("lock.setPin")} onPress={() => nav.push({ name: "pinSetup" })} />
             ) : (
@@ -98,7 +128,12 @@ export function SettingsScreen() {
                     value={vault.biometric}
                     onChange={async (v) => {
                       try {
-                        if (v) await keys.enableBiometric(t("lock.biometricTitle"), t("lock.biometricSubtitle"), t("common.cancel"));
+                        if (v)
+                          await keys.enableBiometric(
+                            t("lock.biometricTitle"),
+                            t("lock.biometricSubtitle"),
+                            t("common.cancel"),
+                          );
                         else await keys.disableBiometric();
                       } catch (e) {
                         Alert.alert(t("common.error"), String(e));
@@ -141,28 +176,49 @@ export function KeysScreen() {
     nativeDocuments.setSecureScreen(true);
     return () => nativeDocuments.setSecureScreen(false);
   }, []);
-  if (!keys.loaded) return <Screen title={t("keys.title")}><Notice>{t("keys.locked")}</Notice></Screen>;
+  if (!keys.loaded)
+    return (
+      <Screen title={t("keys.title")}>
+        <Notice>{t("keys.locked")}</Notice>
+      </Screen>
+    );
   const reader = keys.reader();
   const contributor = keys.contributor();
   const mod = keys.moderator();
   return (
     <Screen title={t("keys.title")}>
       <Section title={t("keys.reader")}>
-        <Txt muted size={14}>{t("keys.backupHelp")}</Txt>
+        <Txt muted size={14}>
+          {t("keys.backupHelp")}
+        </Txt>
         {reader ? (
           <>
-            <Txt selectable size={13}>{reader.npub}</Txt>
+            <Txt selectable size={13}>
+              {reader.npub}
+            </Txt>
             {show ? (
               <Card>
-                <Txt selectable size={13}>{reader.nsec}</Txt>
+                <Txt selectable size={13}>
+                  {reader.nsec}
+                </Txt>
               </Card>
             ) : null}
-            <Button kind="secondary" title={show ? t("keys.hide") : t("keys.export")} onPress={() => setShow((s) => !s)} />
+            <Button
+              kind="secondary"
+              title={show ? t("keys.hide") : t("keys.export")}
+              onPress={() => setShow((s) => !s)}
+            />
           </>
         ) : (
           <Txt muted>{t("keys.noReader")}</Txt>
         )}
-        <Field label={t("keys.import")} value={importText} onChangeText={setImportText} autoCapitalize="none" secureTextEntry />
+        <Field
+          label={t("keys.import")}
+          value={importText}
+          onChangeText={setImportText}
+          autoCapitalize="none"
+          secureTextEntry
+        />
         <Button
           kind="secondary"
           title={t("keys.import")}
@@ -177,13 +233,19 @@ export function KeysScreen() {
       </Section>
       {contributor ? (
         <Section title={t("keys.contributor")}>
-          <Txt selectable size={13}>{contributor.npub}</Txt>
+          <Txt selectable size={13}>
+            {contributor.npub}
+          </Txt>
         </Section>
       ) : null}
       {mod ? (
         <Section title={t("keys.moderator")}>
-          <Txt selectable size={13}>{mod.keys.npub}</Txt>
-          <Txt muted size={12} selectable>X25519 {mod.x25519.publicKey}</Txt>
+          <Txt selectable size={13}>
+            {mod.keys.npub}
+          </Txt>
+          <Txt muted size={12} selectable>
+            X25519 {mod.x25519.publicKey}
+          </Txt>
         </Section>
       ) : null}
       <Section title={t("keys.wipeTitle")}>
@@ -226,8 +288,22 @@ export function PinSetupScreen({ then }: { then?: Route }) {
   return (
     <Screen title={t("lock.setPin")}>
       <Txt style={{ marginBottom: space.m }}>{t("lock.pinHelp")}</Txt>
-      <Field label={t("lock.pin")} value={pin} onChangeText={setPin} keyboardType="number-pad" secureTextEntry maxLength={12} />
-      <Field label={t("lock.pinAgain")} value={again} onChangeText={setAgain} keyboardType="number-pad" secureTextEntry maxLength={12} />
+      <Field
+        label={t("lock.pin")}
+        value={pin}
+        onChangeText={setPin}
+        keyboardType="number-pad"
+        secureTextEntry
+        maxLength={12}
+      />
+      <Field
+        label={t("lock.pinAgain")}
+        value={again}
+        onChangeText={setAgain}
+        keyboardType="number-pad"
+        secureTextEntry
+        maxLength={12}
+      />
       {again && pin !== again ? <Txt muted>{t("lock.pinMismatch")}</Txt> : null}
       <Button title={t("common.save")} disabled={!ok} busy={busy} onPress={() => void save()} />
     </Screen>
@@ -251,7 +327,11 @@ export function LockScreen({ onUnlocked, vault }: { onUnlocked: () => void; vaul
         onUnlocked();
       } else {
         setPin("");
-        setError(r.retryAt > Date.now() ? t("lock.wait", { seconds: secondsUntilRetry(r.retryAt) }) : t("lock.wrong", { left: r.attemptsLeft }));
+        setError(
+          r.retryAt > Date.now()
+            ? t("lock.wait", { seconds: secondsUntilRetry(r.retryAt) })
+            : t("lock.wrong", { left: r.attemptsLeft }),
+        );
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -275,13 +355,25 @@ export function LockScreen({ onUnlocked, vault }: { onUnlocked: () => void; vaul
   return (
     <Screen title={t("lock.locked")}>
       <Txt style={{ marginBottom: space.l }}>{t("lock.enterPin")}</Txt>
-      <Field label={t("lock.pin")} value={pin} onChangeText={setPin} keyboardType="number-pad" secureTextEntry maxLength={12} onSubmitEditing={() => void unlockPin()} />
+      <Field
+        label={t("lock.pin")}
+        value={pin}
+        onChangeText={setPin}
+        keyboardType="number-pad"
+        secureTextEntry
+        maxLength={12}
+        onSubmitEditing={() => void unlockPin()}
+      />
       {error ? <Notice tone="bad">{error}</Notice> : null}
       {wait > 0 ? <Txt muted>{t("lock.wait", { seconds: wait })}</Txt> : null}
       <Button title={t("lock.unlock")} disabled={pin.length < 6} busy={busy} onPress={() => void unlockPin()} />
-      {vault.biometric ? <Button kind="secondary" title={t("lock.useBiometric")} onPress={() => void unlockBio()} /> : null}
+      {vault.biometric ? (
+        <Button kind="secondary" title={t("lock.useBiometric")} onPress={() => void unlockBio()} />
+      ) : null}
       <View style={{ height: space.xl }} />
-      <Txt muted size={13}>{t("lock.readerNote")}</Txt>
+      <Txt muted size={13}>
+        {t("lock.readerNote")}
+      </Txt>
     </Screen>
   );
 }
@@ -334,8 +426,12 @@ export function UpdateScreen() {
         <Card>
           <Txt bold>{t("update.available", { version: release.version })}</Txt>
           {release.notes ? <Txt>{release.notes[lang] ?? release.notes.en ?? release.notes.hi ?? ""}</Txt> : null}
-          <Txt muted size={12} selectable>SHA-256 {release.sha256}</Txt>
-          <Txt muted size={12} selectable>{t("update.cert")} {release.signingCertSha256}</Txt>
+          <Txt muted size={12} selectable>
+            SHA-256 {release.sha256}
+          </Txt>
+          <Txt muted size={12} selectable>
+            {t("update.cert")} {release.signingCertSha256}
+          </Txt>
           {progress !== null ? <Txt>{t("update.downloading", { percent: Math.round(progress * 100) })}</Txt> : null}
           {ready ? <Notice tone="ok">{t("update.verified")}</Notice> : null}
           {error ? <Notice tone="bad">{error}</Notice> : null}

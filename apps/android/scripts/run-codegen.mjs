@@ -20,9 +20,13 @@ const schema = resolve(out, "schema.json");
 const combine = require.resolve("@react-native/codegen/lib/cli/combine/combine-js-to-schema-cli.js");
 const generate = resolve(dirname(require.resolve("react-native/package.json")), "scripts/generate-specs-cli.js");
 
-execFileSync(process.execPath, [combine, "--platform", "android", "--libraryName", name, schema, resolve(root, jsSrcsDir)], {
-  stdio: "inherit",
-});
+execFileSync(
+  process.execPath,
+  [combine, "--platform", "android", "--libraryName", name, schema, resolve(root, jsSrcsDir)],
+  {
+    stdio: "inherit",
+  },
+);
 execFileSync(
   process.execPath,
   [

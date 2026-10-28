@@ -229,7 +229,8 @@ export function atobFallback(input: string): string {
 export function installLanguagePolyfills(target: Record<string, any> = g): void {
   if (typeof target.TextEncoder === "undefined") target.TextEncoder = Utf8TextEncoder;
   if (typeof target.TextDecoder === "undefined") target.TextDecoder = Utf8TextDecoder;
-  if (typeof target.structuredClone === "undefined") target.structuredClone = (v: unknown) => structuredCloneFallback(v);
+  if (typeof target.structuredClone === "undefined")
+    target.structuredClone = (v: unknown) => structuredCloneFallback(v);
   if (typeof target.AggregateError === "undefined") target.AggregateError = AggregateErrorFallback;
   const P = (target.Promise ?? Promise) as { any?: unknown };
   if (typeof P.any !== "function") P.any = promiseAnyFallback;

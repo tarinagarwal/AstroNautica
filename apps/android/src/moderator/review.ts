@@ -13,7 +13,13 @@ import {
   type EffectiveLists,
   type EncryptionKeyPair,
 } from "@azaadawaaz/core";
-import { approvalBodySha256, mediaHashes, validateApprovalBody, type Approval, type ApprovalBody } from "@azaadawaaz/schema";
+import {
+  approvalBodySha256,
+  mediaHashes,
+  validateApprovalBody,
+  type Approval,
+  type ApprovalBody,
+} from "@azaadawaaz/schema";
 import { getPublicKey } from "nostr-tools/pure";
 import type { Api, ApiConfig, SubmissionDetail } from "../api/client";
 import { encryptFeedback } from "../contributor/submissions";
@@ -41,7 +47,8 @@ export function bodyProblems(body: ApprovalBody, detail: SubmissionDetail): stri
   if (body.version !== detail.version) out.push("version differs from the submission");
   if ((body.supersedes ?? null) !== (detail.supersedes ?? null)) out.push("supersedes differs from the submission");
   try {
-    if (body.contributor?.pubkey !== hexToNpub(detail.contributor)) out.push("contributor key differs from the submitter");
+    if (body.contributor?.pubkey !== hexToNpub(detail.contributor))
+      out.push("contributor key differs from the submitter");
   } catch {
     out.push("contributor key is invalid");
   }
@@ -80,7 +87,10 @@ export async function approve(
   if (opened.problems.length) throw new Error(`cannot approve: ${opened.problems.join("; ")}`);
   const approval = signApproval(opened.body, me.secretKey, approvedAt);
   const publisherWrappedKey = await wrapKey(opened.contentKey, publisherKey(lists, config));
-  const auditEvent = createAuditEvent({ action: "approve", submissionId: opened.detail.id, storyId: opened.detail.storyId }, me.secretKey);
+  const auditEvent = createAuditEvent(
+    { action: "approve", submissionId: opened.detail.id, storyId: opened.detail.storyId },
+    me.secretKey,
+  );
   await api.approve(opened.detail.id, {
     approval,
     approvalBodySha256: approvalBodySha256(opened.body),

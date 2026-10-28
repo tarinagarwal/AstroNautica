@@ -263,7 +263,11 @@ export async function fetchBlock(cid: Cid, src: BlockSource, cache: BlockCache =
   throw new BlockFetchError(cid.string);
 }
 
-export async function fetchFileByCid(cid: Cid | string, src: BlockSource, maxBytes = 64 * 1024 * 1024): Promise<Uint8Array> {
+export async function fetchFileByCid(
+  cid: Cid | string,
+  src: BlockSource,
+  maxBytes = 64 * 1024 * 1024,
+): Promise<Uint8Array> {
   const root = typeof cid === "string" ? parseCid(cid) : cid;
   let total = 0;
   const count = (b: Uint8Array) => {

@@ -82,7 +82,10 @@ export class KeyCheckError extends Error {
  * after checking each against the owner-signed lists. A server that adds a key not on the signed lists (to read
  * submissions) or leaves out a moderator is refused.
  */
-export function recipientsFor(config: ApiConfig, lists: Pick<EffectiveLists, "moderators" | "activeModerators" | "serviceKeys" | "owner">): string[] {
+export function recipientsFor(
+  config: ApiConfig,
+  lists: Pick<EffectiveLists, "moderators" | "activeModerators" | "serviceKeys" | "owner">,
+): string[] {
   const signedOwner = lists.serviceKeys.find((k) => k.role === "owner" && k.pubkey === lists.owner && !k.until)?.x25519;
   const signedMods = new Map(
     lists.moderators.filter((m) => lists.activeModerators.has(m.pubkey)).map((m) => [m.pubkey, m.x25519]),
@@ -168,7 +171,13 @@ export async function runUpload(
     supersedes: s.supersedes,
     bodyCiphertext: s.bodyCiphertext!,
     wrappedKeys: s.wrappedKeys!,
-    media: s.media.map((m) => ({ sha256: m.sha256, size: m.size, mime: m.mime, kind: m.kind, chunks: m.chunks!.length })),
+    media: s.media.map((m) => ({
+      sha256: m.sha256,
+      size: m.size,
+      mime: m.mime,
+      kind: m.kind,
+      chunks: m.chunks!.length,
+    })),
   });
 
   // 2. Create the submission, or replace the body and media list of an existing one (edit after change requests).

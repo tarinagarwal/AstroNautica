@@ -72,7 +72,11 @@ export function createSodiumAdapter(backend: SodiumBackend) {
 
     crypto_box_keypair() {
       const kp = JSON.parse(backend.boxKeypair()) as { publicKey: string; privateKey: string };
-      return { publicKey: base64ToBytes(kp.publicKey), privateKey: base64ToBytes(kp.privateKey), keyType: "x25519" as const };
+      return {
+        publicKey: base64ToBytes(kp.publicKey),
+        privateKey: base64ToBytes(kp.privateKey),
+        keyType: "x25519" as const,
+      };
     },
     crypto_scalarmult_base(privateKey: Uint8Array): Uint8Array {
       if (privateKey.length !== 32) throw new Error("invalid privateKey length");

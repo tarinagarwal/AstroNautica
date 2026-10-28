@@ -96,7 +96,12 @@ export function nodeFs(root = tempDir()): FileSystem {
       const root = path.resolve(destDir);
       const out: ZipEntry[] = [];
       for (const name of names) {
-        if (!name || name.startsWith("/") || name.includes("\\") || name.split("/").some((s) => s === ".." || s === "."))
+        if (
+          !name ||
+          name.startsWith("/") ||
+          name.includes("\\") ||
+          name.split("/").some((s) => s === ".." || s === ".")
+        )
           throw new Error(`unsafe entry name: ${name}`);
         const target = path.resolve(root, name);
         if (!target.startsWith(root + path.sep)) throw new Error(`entry escapes the destination: ${name}`);
@@ -116,17 +121,31 @@ export function nodeFs(root = tempDir()): FileSystem {
   };
 }
 
-export type Handler = (req: { url: string; method: string; headers: Record<string, string>; body?: Uint8Array }) =>
+export type Handler = (req: {
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+  body?: Uint8Array;
+}) =>
   | { status?: number; body?: Uint8Array | string; headers?: Record<string, string> }
   | Promise<{ status?: number; body?: Uint8Array | string; headers?: Record<string, string> }>;
 
 /** An in-process HTTP stack for tests: routes requests to a handler (no sockets), with download/upload semantics. */
-export function fakeHttp(handler: Handler, fsImpl?: FileSystem): Http & { requests: { url: string; method: string }[] } {
+export function fakeHttp(
+  handler: Handler,
+  fsImpl?: FileSystem,
+): Http & { requests: { url: string; method: string }[] } {
   const requests: { url: string; method: string }[] = [];
-  const run = async (url: string, method: string, headers: Record<string, string>, body?: Uint8Array): Promise<HttpResponse> => {
+  const run = async (
+    url: string,
+    method: string,
+    headers: Record<string, string>,
+    body?: Uint8Array,
+  ): Promise<HttpResponse> => {
     requests.push({ url, method });
     const r = await handler({ url, method, headers, body });
-    const b = r.body === undefined ? new Uint8Array(0) : typeof r.body === "string" ? new TextEncoder().encode(r.body) : r.body;
+    const b =
+      r.body === undefined ? new Uint8Array(0) : typeof r.body === "string" ? new TextEncoder().encode(r.body) : r.body;
     return { status: r.status ?? 200, headers: r.headers ?? {}, body: b, url };
   };
   return {
@@ -163,7 +182,12 @@ export const nodeHttp: Http = {
     const timer = setTimeout(() => ctl.abort(), req.timeoutMs ?? 30_000);
     req.signal?.addEventListener("abort", () => ctl.abort());
     try {
-      const res = await fetch(req.url, { method: req.method ?? "GET", headers: req.headers, body: req.body as BodyInit | undefined, signal: ctl.signal });
+      const res = await fetch(req.url, {
+        method: req.method ?? "GET",
+        headers: req.headers,
+        body: req.body as BodyInit | undefined,
+        signal: ctl.signal,
+      });
       const body = new Uint8Array(await res.arrayBuffer());
       const headers: Record<string, string> = {};
       res.headers.forEach((v, k) => (headers[k] = v));

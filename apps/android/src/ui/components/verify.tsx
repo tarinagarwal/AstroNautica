@@ -12,7 +12,10 @@ function Check({ state, label, detail }: { state: CheckState; label: string; det
   const { t } = useI18n();
   return (
     <View style={{ flexDirection: "row", alignItems: "flex-start", marginBottom: space.m, gap: space.s }}>
-      <Badge tone={state === "ok" ? "ok" : state === "fail" ? "bad" : "neutral"} label={state === "ok" ? "✓" : state === "fail" ? "✗" : "…"} />
+      <Badge
+        tone={state === "ok" ? "ok" : state === "fail" ? "bad" : "neutral"}
+        label={state === "ok" ? "✓" : state === "fail" ? "✗" : "…"}
+      />
       <View style={{ flex: 1 }}>
         <Txt bold>{label}</Txt>
         {detail ? (
@@ -51,7 +54,14 @@ export function VerifyPanel({ story }: { story: StoryRef }) {
       <Txt bold size={20} style={{ marginBottom: space.m }}>
         {t("verify.title")}
       </Txt>
-      <View style={{ padding: space.m, borderRadius: 8, marginBottom: space.l, backgroundColor: r.allOk ? colors.okBg : done ? colors.badBg : colors.code }}>
+      <View
+        style={{
+          padding: space.m,
+          borderRadius: 8,
+          marginBottom: space.l,
+          backgroundColor: r.allOk ? colors.okBg : done ? colors.badBg : colors.code,
+        }}
+      >
         <Txt bold>{r.allOk ? t("verify.ok") : done ? t("verify.failed") : t("verify.checking")}</Txt>
       </View>
       <Check state={r.event.state} label={t("verify.publisher")} detail={story.publisher} />
@@ -61,15 +71,33 @@ export function VerifyPanel({ story }: { story: StoryRef }) {
         detail={[r.manifest.sha256, ...(m?.errors ?? [])].join("\n")}
       />
       {m ? (
-        <Check state={m.checks.approvalSignature && m.checks.moderatorAuthorised ? "ok" : "fail"} label={t("verify.signature")} detail={m.manifest?.approval.moderator} />
+        <Check
+          state={m.checks.approvalSignature && m.checks.moderatorAuthorised ? "ok" : "fail"}
+          label={t("verify.signature")}
+          detail={m.manifest?.approval.moderator}
+        />
       ) : null}
-      <Check state={r.ipfs.state} label={t("verify.ipfs")} detail={[r.ipfs.cid, r.ipfs.gateway, r.ipfs.error].filter(Boolean).join("\n")} />
+      <Check
+        state={r.ipfs.state}
+        label={t("verify.ipfs")}
+        detail={[r.ipfs.cid, r.ipfs.gateway, r.ipfs.error].filter(Boolean).join("\n")}
+      />
       <Check
         state={r.arweave.state}
         label={t("verify.arweave")}
-        detail={r.arweave.tx ? [r.arweave.tx, r.arweave.gateway].filter(Boolean).join("\n") : r.arweave.error ? t(`verify.arweave.${r.arweave.error}`) : undefined}
+        detail={
+          r.arweave.tx
+            ? [r.arweave.tx, r.arweave.gateway].filter(Boolean).join("\n")
+            : r.arweave.error
+              ? t(`verify.arweave.${r.arweave.error}`)
+              : undefined
+        }
       />
-      <Check state={r.chains.state} label={t("verify.chain")} detail={r.chains.error === "no-chains" ? t("verify.noChains") : undefined} />
+      <Check
+        state={r.chains.state}
+        label={t("verify.chain")}
+        detail={r.chains.error === "no-chains" ? t("verify.noChains") : undefined}
+      />
       {r.chains.receipts.map((c) => (
         <View key={c.chain.key} style={{ marginLeft: space.xl, marginBottom: space.s }}>
           <Txt size={14} bold>

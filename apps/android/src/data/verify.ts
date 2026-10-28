@@ -3,7 +3,14 @@
  * moderator, publisher), the IPFS CID resolving block by block to the same bytes, the Arweave copy named by the
  * storage receipt, and the on-chain receipt on every configured chain. "Original and unedited" only when all pass.
  */
-import { fetchVerified, sourcesFor, verifyEventStrict, wasPublisherAt, type ManifestCheck, type StoryRef } from "@azaadawaaz/core";
+import {
+  fetchVerified,
+  sourcesFor,
+  verifyEventStrict,
+  wasPublisherAt,
+  type ManifestCheck,
+  type StoryRef,
+} from "@azaadawaaz/core";
 import { sha256Hex } from "@azaadawaaz/schema";
 import type { Http } from "../platform/types";
 import type { AppData } from "./appData";
@@ -58,7 +65,10 @@ export async function verifyStory(
     onUpdate(r);
   };
 
-  const eventOk = verifyEventStrict(ref.event) && !!app.lists && wasPublisherAt(app.lists, ref.publisher, ref.createdAt, ref.manifestSha256);
+  const eventOk =
+    verifyEventStrict(ref.event) &&
+    !!app.lists &&
+    wasPublisherAt(app.lists, ref.publisher, ref.createdAt, ref.manifestSha256);
   update({ event: { state: eventOk ? "ok" : "fail" } });
 
   const tasks: Promise<void>[] = [];
@@ -66,7 +76,9 @@ export async function verifyStory(
   tasks.push(
     app
       .loadManifest(ref)
-      .then((m) => update({ manifest: { state: m.check.ok ? "ok" : "fail", sha256: ref.manifestSha256, check: m.check } }))
+      .then((m) =>
+        update({ manifest: { state: m.check.ok ? "ok" : "fail", sha256: ref.manifestSha256, check: m.check } }),
+      )
       .catch(() => update({ manifest: { state: "fail", sha256: ref.manifestSha256 } })),
   );
 
@@ -85,7 +97,9 @@ export async function verifyStory(
           4 * 1024 * 1024,
         );
         const ok = sha256Hex(bytes) === ref.manifestSha256;
-        update({ ipfs: { state: ok ? "ok" : "fail", cid: ref.manifestCid, gateway, error: ok ? undefined : "mismatch" } });
+        update({
+          ipfs: { state: ok ? "ok" : "fail", cid: ref.manifestCid, gateway, error: ok ? undefined : "mismatch" },
+        });
       } catch (e) {
         update({ ipfs: { state: "fail", cid: ref.manifestCid, error: e instanceof Error ? e.message : String(e) } });
       }

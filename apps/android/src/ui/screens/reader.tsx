@@ -1,7 +1,7 @@
 import type { StoryRef } from "@azaadawaaz/core";
 import React, { useEffect, useState } from "react";
 import { Alert, Linking, View } from "react-native";
-import { unlistStory } from "../../moderator/actions";
+import { setFeatured, unlistStory } from "../../moderator/actions";
 import { signerFromSecret } from "../../api/nip98";
 import { useObservable, useServices } from "../context";
 import { useI18n } from "../i18n";
@@ -151,13 +151,25 @@ export function StoryScreen({ storyId, offline }: { storyId: string; offline?: b
     };
   }, [app, saved, storyId, offline]);
 
-  if (state === "loading") return <Screen title={t("story.loading")}><Loading label={t("story.loading")} /></Screen>;
-  if (state === "notfound") return <Screen title={t("app.name")}><Notice tone="bad">{t("story.notFound")}</Notice></Screen>;
+  if (state === "loading")
+    return (
+      <Screen title={t("story.loading")}>
+        <Loading label={t("story.loading")} />
+      </Screen>
+    );
+  if (state === "notfound")
+    return (
+      <Screen title={t("app.name")}>
+        <Notice tone="bad">{t("story.notFound")}</Notice>
+      </Screen>
+    );
   if ("error" in state)
     return (
       <Screen title={t("app.name")}>
         <Notice tone="bad">{t("error.allSourcesFailed")}</Notice>
-        <Txt muted size={13}>{state.error}</Txt>
+        <Txt muted size={13}>
+          {state.error}
+        </Txt>
       </Screen>
     );
   const { ref, manifest } = state;
@@ -195,8 +207,18 @@ export function StoryScreen({ storyId, offline }: { storyId: string; offline?: b
         text: t("moderate.unlist"),
         style: "destructive",
         onPress: () =>
-          void unlistStory(app, services.api().withSigner(signerFromSecret(mod!.keys.secretKey)), mod!.keys.secretKey, mod!.keys.pubkey, ref.storyId).then(
-            (r) => Alert.alert(t("moderate.done"), r.auditError ? t("moderate.auditPending", { error: r.auditError }) : undefined),
+          void unlistStory(
+            app,
+            services.api().withSigner(signerFromSecret(mod!.keys.secretKey)),
+            mod!.keys.secretKey,
+            mod!.keys.pubkey,
+            ref.storyId,
+          ).then(
+            (r) =>
+              Alert.alert(
+                t("moderate.done"),
+                r.auditError ? t("moderate.auditPending", { error: r.auditError }) : undefined,
+              ),
             (e) => Alert.alert(t("common.error"), String(e)),
           ),
       },
@@ -209,19 +231,50 @@ export function StoryScreen({ storyId, offline }: { storyId: string; offline?: b
         <Notice tone="bad">
           <Txt bold>{t("verify.failed")}</Txt>
           {manifest.check.errors.map((e) => (
-            <Txt key={e} size={13}>{e}</Txt>
+            <Txt key={e} size={13}>
+              {e}
+            </Txt>
           ))}
         </Notice>
       ) : null}
       {m && manifest.check.ok ? <StoryView manifest={m} offline={state.offline} /> : null}
       <Row style={{ marginVertical: space.m }}>
-        <Button kind="secondary" small title={showVerify ? t("common.close") : t("verify.button")} onPress={() => setShowVerify((v) => !v)} />
-        <Button kind="secondary" small title={t("story.share")} onPress={() => nav.push({ name: "share", storyId: ref.storyId })} />
+        <Button
+          kind="secondary"
+          small
+          title={showVerify ? t("common.close") : t("verify.button")}
+          onPress={() => setShowVerify((v) => !v)}
+        />
+        <Button
+          kind="secondary"
+          small
+          title={t("story.share")}
+          onPress={() => nav.push({ name: "share", storyId: ref.storyId })}
+        />
         {isSaved ? (
           <Badge tone="ok" label={t("offline.saved")} />
         ) : (
           <Button kind="secondary" small busy={saving} title={t("offline.save")} onPress={() => void save()} />
         )}
+        {canUnlist ? (
+          <Button
+            kind="secondary"
+            small
+            title={app.lists?.featured.has(ref.storyId) ? t("moderate.unfeature") : t("moderate.feature")}
+            onPress={() =>
+              void setFeatured(
+                app,
+                mod!.keys.secretKey,
+                mod!.keys.pubkey,
+                ref.storyId,
+                !app.lists?.featured.has(ref.storyId),
+              ).then(
+                () => Alert.alert(t("moderate.done")),
+                (e) => Alert.alert(t("common.error"), String(e)),
+              )
+            }
+          />
+        ) : null}
         {canUnlist ? <Button kind="danger" small title={t("moderate.unlist")} onPress={unlist} /> : null}
       </Row>
       {showVerify ? <VerifyPanel story={ref} /> : null}
@@ -283,8 +336,12 @@ export function ReachScreen() {
   useObservable(app);
   useObservable(net);
   const lists = app.lists;
-  const androidRelease = lists?.releases.filter((r) => r.platform === "android").sort((a, b) => b.versionCode - a.versionCode)[0];
-  const webRelease = lists?.releases.filter((r) => r.platform === "web").sort((a, b) => b.versionCode - a.versionCode)[0];
+  const androidRelease = lists?.releases
+    .filter((r) => r.platform === "android")
+    .sort((a, b) => b.versionCode - a.versionCode)[0];
+  const webRelease = lists?.releases
+    .filter((r) => r.platform === "web")
+    .sort((a, b) => b.versionCode - a.versionCode)[0];
   const openUrl = (u: string) =>
     Alert.alert(t("link.openTitle"), t("link.openBody", { url: u }), [
       { text: t("common.cancel"), style: "cancel" },
@@ -318,7 +375,9 @@ export function ReachScreen() {
       <Section title={t("reach.ipfs")}>
         {webRelease && webRelease.platform === "web" ? (
           <>
-            <Txt selectable size={14}>{webRelease.cid}</Txt>
+            <Txt selectable size={14}>
+              {webRelease.cid}
+            </Txt>
             {app.gateways.ipfsLinks(webRelease.cid).map((u) => (
               <Button key={u} kind="link" title={u} onPress={() => openUrl(u)} />
             ))}

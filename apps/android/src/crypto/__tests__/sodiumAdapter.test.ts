@@ -72,6 +72,7 @@ beforeAll(async () => {
   const adapter = createSodiumAdapter(backend);
   jest.isolateModules(() => {
     jest.doMock("libsodium-wrappers", () => ({ __esModule: true, default: adapter }));
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- a second, isolated copy of core
     adapted = require("@azaadawaaz/core");
   });
 });
@@ -109,11 +110,22 @@ describe("libsodium-wrappers adapter under packages/core staging", () => {
 
   it("detects tampering, truncation and reordering like core", async () => {
     const key = await adapted.newContentKey();
-    const blob = await core.encryptBytes(Uint8Array.from({ length: 3000 }, (_, i) => i & 255), key, 1000);
-    const bad = { header: blob.header, chunks: blob.chunks.map((c, i) => (i === 1 ? Uint8Array.from(c, (x, j) => (j === 3 ? x ^ 1 : x)) : c)) };
+    const blob = await core.encryptBytes(
+      Uint8Array.from({ length: 3000 }, (_, i) => i & 255),
+      key,
+      1000,
+    );
+    const bad = {
+      header: blob.header,
+      chunks: blob.chunks.map((c, i) => (i === 1 ? Uint8Array.from(c, (x, j) => (j === 3 ? x ^ 1 : x)) : c)),
+    };
     await expect(adapted.decryptBytes(bad, key)).rejects.toThrow();
-    await expect(adapted.decryptBytes({ header: blob.header, chunks: blob.chunks.slice(0, 2) }, key)).rejects.toThrow(/truncated/);
-    await expect(adapted.decryptBytes({ header: blob.header, chunks: [blob.chunks[1]!, blob.chunks[0]!, blob.chunks[2]!] }, key)).rejects.toThrow();
+    await expect(adapted.decryptBytes({ header: blob.header, chunks: blob.chunks.slice(0, 2) }, key)).rejects.toThrow(
+      /truncated/,
+    );
+    await expect(
+      adapted.decryptBytes({ header: blob.header, chunks: [blob.chunks[1]!, blob.chunks[0]!, blob.chunks[2]!] }, key),
+    ).rejects.toThrow();
   });
 
   it("does not leave stream states behind after complete streams", async () => {
@@ -126,7 +138,9 @@ describe("libsodium-wrappers adapter under packages/core staging", () => {
   it("refuses additional data and malformed input instead of misbehaving", () => {
     const a = createSodiumAdapter(backend);
     const { state } = a.crypto_secretstream_xchacha20poly1305_init_push(new Uint8Array(32));
-    expect(() => a.crypto_secretstream_xchacha20poly1305_push(state, new Uint8Array(1), new Uint8Array(1), 0)).toThrow();
+    expect(() =>
+      a.crypto_secretstream_xchacha20poly1305_push(state, new Uint8Array(1), new Uint8Array(1), 0),
+    ).toThrow();
     expect(() => a.from_hex("zz")).toThrow();
     expect(a.to_base64(Uint8Array.from([251, 255]), a.base64_variants.URLSAFE_NO_PADDING)).toBe("-_8");
     expect(a.from_base64("-_8")).toEqual(Uint8Array.from([251, 255]));

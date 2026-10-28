@@ -4,10 +4,18 @@ import { extractInviteCode, parseInvite, redemptionFor } from "../invite";
 import { decryptFeedback, encryptFeedback, canEdit } from "../submissions";
 
 describe("invites", () => {
-  const { link, event } = createInvite(owner.secretKey, { note: "welcome", expiresAt: Math.floor(Date.now() / 1000) + 3600 });
+  const { link, event } = createInvite(owner.secretKey, {
+    note: "welcome",
+    expiresAt: Math.floor(Date.now() / 1000) + 3600,
+  });
 
   it("accepts every link form", () => {
-    for (const text of [`azaadawaaz://invite/${link}`, `https://azaadawaaz.org/#/invite/${link}`, `https://x.onion/#invite=${link}`, ` ${link} `])
+    for (const text of [
+      `azaadawaaz://invite/${link}`,
+      `https://azaadawaaz.org/#/invite/${link}`,
+      `https://x.onion/#invite=${link}`,
+      ` ${link} `,
+    ])
       expect(extractInviteCode(text)).toBe(link);
     expect(extractInviteCode("https://azaadawaaz.org/")).toBeUndefined();
   });

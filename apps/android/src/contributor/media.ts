@@ -7,7 +7,13 @@
  * orientation is not upright are first decoded and re-encoded as JPEG by the platform encoder (quality 92), which
  * writes no metadata; then media-strip strips the bytes. Videos are stripped in place without re-encoding through the skeleton planner (bmffSkeleton.ts).
  */
-import { detectMime, findMetadata, readJpegOrientation, stripMetadata, STRIPPABLE_MIMES } from "@azaadawaaz/media-strip";
+import {
+  detectMime,
+  findMetadata,
+  readJpegOrientation,
+  stripMetadata,
+  STRIPPABLE_MIMES,
+} from "@azaadawaaz/media-strip";
 import { sha256Hex } from "@azaadawaaz/schema";
 import { joinPath, type FileSystem } from "../platform/types";
 import { planVideoStrip, verifyVideoStrip, type RandomAccessFile } from "./bmffSkeleton";
@@ -74,7 +80,8 @@ export async function prepareImage(
     }
     const out = stripMetadata(bytes, mime, { keepIcc: false });
     const left = findMetadata(out, mime);
-    if (left.length) throw new MediaError("media.error.metadataLeft", `metadata left after stripping: ${left.join(", ")}`);
+    if (left.length)
+      throw new MediaError("media.error.metadataLeft", `metadata left after stripping: ${left.join(", ")}`);
     if (out.length > limits.maxImageBytes) throw new MediaError("media.error.tooLarge", "image is too large");
     const sha256 = sha256Hex(out);
     const path = joinPath(workDir, sha256);
@@ -119,7 +126,8 @@ export async function prepareVideo(
     );
     const outStat = await fs.stat(output);
     const left = await verifyVideoStrip(fileReader(fs, output, outStat.size), sniffed, plan.zeroed);
-    if (left.length) throw new MediaError("media.error.metadataLeft", `metadata left after stripping: ${left.join(", ")}`);
+    if (left.length)
+      throw new MediaError("media.error.metadataLeft", `metadata left after stripping: ${left.join(", ")}`);
     const sha256 = await fs.sha256(output);
     const path = joinPath(workDir, sha256);
     await fs.move(output, path);

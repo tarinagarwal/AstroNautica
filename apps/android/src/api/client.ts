@@ -229,13 +229,15 @@ export class Api {
   mediaStatus = (id: string, sha: string) => this.json<MediaStatus>("GET", `/submissions/${id}/media/${sha}/status`);
   completeMedia = (id: string, sha: string) =>
     this.json<{ complete: boolean }>("POST", `/submissions/${id}/media/${sha}/complete`, { json: {} });
-  submit = (id: string) => this.json<{ id: string; state: SubmissionState }>("POST", `/submissions/${id}/submit`, { json: {} });
+  submit = (id: string) =>
+    this.json<{ id: string; state: SubmissionState }>("POST", `/submissions/${id}/submit`, { json: {} });
   mySubmissions = () => this.json<MySubmission[]>("GET", "/me/submissions");
 
   // ---- moderator ----
   submission = (id: string, x25519?: string) =>
     this.json<SubmissionDetail>("GET", `/submissions/${id}` + (x25519 ? `?x25519=${encodeURIComponent(x25519)}` : ""));
-  mediaHeader = async (id: string, sha: string) => (await this.send("GET", `/submissions/${id}/media/${sha}/header`)).body;
+  mediaHeader = async (id: string, sha: string) =>
+    (await this.send("GET", `/submissions/${id}/media/${sha}/header`)).body;
   mediaChunk = async (id: string, sha: string, n: number) =>
     (await this.send("GET", `/submissions/${id}/media/${sha}/chunks/${n}`)).body;
   queue = () => this.json<QueueItem[]>("GET", "/queue");

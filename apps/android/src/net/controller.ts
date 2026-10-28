@@ -67,7 +67,9 @@ export class NetController {
 
   private async startTor(): Promise<void> {
     try {
-      this.tor = JSON.parse(await NativeAzaadTor.start(JSON.stringify({ bridges: this.settings.bridges }))) as TorStatus;
+      this.tor = JSON.parse(
+        await NativeAzaadTor.start(JSON.stringify({ bridges: this.settings.bridges })),
+      ) as TorStatus;
     } catch (e) {
       this.tor = { state: "error", socksPort: 0, bootstrap: 0, error: e instanceof Error ? e.message : String(e) };
     }
@@ -137,7 +139,10 @@ export class NetController {
   }
 
   /** Check relays and gateways directly; switch Tor on when nothing answers. Returns true if it did. */
-  async checkAndMaybeEnableTor(relays: string[], gateways: { url: string; network: "ipfs" | "arweave" }[]): Promise<boolean> {
+  async checkAndMaybeEnableTor(
+    relays: string[],
+    gateways: { url: string; network: "ipfs" | "arweave" }[],
+  ): Promise<boolean> {
     if (this.settings.torEnabled) return false;
     this.reachability = await checkReachability(this.probes(), relays, gateways);
     this.emit();

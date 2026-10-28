@@ -21,7 +21,14 @@ import {
 import { parseInvite, redemptionFor } from "../../contributor/invite";
 import { MediaError, prepareImage, prepareVideo } from "../../contributor/media";
 import { canEdit, decryptFeedback, stateKey } from "../../contributor/submissions";
-import { KeyCheckError, newUploadState, recipientsFor, runUpload, type UploadProgress, type UploadState } from "../../contributor/upload";
+import {
+  KeyCheckError,
+  newUploadState,
+  recipientsFor,
+  runUpload,
+  type UploadProgress,
+  type UploadState,
+} from "../../contributor/upload";
 import { nativeDocuments } from "../../platform/nativeFiles";
 import { joinPath } from "../../platform/types";
 import { LockRequiredError } from "../../security/keys";
@@ -64,19 +71,28 @@ export function ContributeScreen() {
   }, [drafts, kp, services]);
   useEffect(() => void refresh(), [refresh]);
 
-  if (!keys.loaded) return <Screen title={t("contrib.title")}><Notice>{t("keys.locked")}</Notice></Screen>;
+  if (!keys.loaded)
+    return (
+      <Screen title={t("contrib.title")}>
+        <Notice>{t("keys.locked")}</Notice>
+      </Screen>
+    );
   if (!kp)
     return (
       <Screen title={t("contrib.title")}>
         <Txt style={{ marginBottom: space.m }}>{t("contrib.intro")}</Txt>
-        <Txt muted style={{ marginBottom: space.m }}>{t("contrib.inviteHelp")}</Txt>
+        <Txt muted style={{ marginBottom: space.m }}>
+          {t("contrib.inviteHelp")}
+        </Txt>
         <Button title={t("invite.open")} onPress={() => nav.push({ name: "invite" })} />
       </Screen>
     );
   const draftFor = (submissionId: string) => draftList.find((d) => d.submissionId === submissionId);
   return (
     <Screen title={t("contrib.title")}>
-      <Txt muted style={{ marginBottom: space.m }}>{t("contrib.intro")}</Txt>
+      <Txt muted style={{ marginBottom: space.m }}>
+        {t("contrib.intro")}
+      </Txt>
       <Button title={t("contrib.new")} onPress={() => nav.push({ name: "editor" })} />
       <Section title={t("contrib.drafts")}>
         {draftList.filter((d) => !d.submissionId).length === 0 ? <Txt muted>{t("contrib.noDrafts")}</Txt> : null}
@@ -85,7 +101,9 @@ export function ContributeScreen() {
           .map((d) => (
             <Card key={d.localId} onPress={() => nav.push({ name: "editor", draftId: d.localId })}>
               <Txt bold>{d.title.en || d.title.hi || t("contrib.untitled")}</Txt>
-              <Txt muted size={13}>{t("contrib.updated", { date: date(d.updatedAt, true) })}</Txt>
+              <Txt muted size={13}>
+                {t("contrib.updated", { date: date(d.updatedAt, true) })}
+              </Txt>
             </Card>
           ))}
       </Section>
@@ -98,24 +116,57 @@ export function ContributeScreen() {
           return (
             <Card key={s.id}>
               <Row>
-                <Txt bold style={{ flex: 1 }}>{d ? d.title.en || d.title.hi : t("contrib.untitled")}</Txt>
-                <Badge tone={s.state === "published" ? "ok" : s.state === "rejected" ? "bad" : s.state === "changes_requested" ? "warn" : "neutral"} label={t(stateKey(s.state))} />
+                <Txt bold style={{ flex: 1 }}>
+                  {d ? d.title.en || d.title.hi : t("contrib.untitled")}
+                </Txt>
+                <Badge
+                  tone={
+                    s.state === "published"
+                      ? "ok"
+                      : s.state === "rejected"
+                        ? "bad"
+                        : s.state === "changes_requested"
+                          ? "warn"
+                          : "neutral"
+                  }
+                  label={t(stateKey(s.state))}
+                />
               </Row>
               <Txt muted size={13}>
-                {t("contrib.version", { version: s.version })} · {t("contrib.updated", { date: date(s.updatedAt, true) })}
+                {t("contrib.version", { version: s.version })} ·{" "}
+                {t("contrib.updated", { date: date(s.updatedAt, true) })}
               </Txt>
               {s.feedback.map((f, i) => {
                 const dec = decryptFeedback(f, kp.secretKey);
                 return (
                   <Notice key={i} tone={f.kind === "reject" ? "bad" : "warn"}>
-                    <Txt bold size={14}>{f.kind === "reject" ? t("contrib.rejectedBecause") : t("contrib.changesRequested")}</Txt>
+                    <Txt bold size={14}>
+                      {f.kind === "reject" ? t("contrib.rejectedBecause") : t("contrib.changesRequested")}
+                    </Txt>
                     <Txt size={14}>{dec.text ?? t("contrib.feedbackUnreadable")}</Txt>
                   </Notice>
                 );
               })}
-              {canEdit(s) && d ? <Button small title={t("contrib.editResubmit")} onPress={() => nav.push({ name: "editor", draftId: d.localId })} /> : null}
-              {canEdit(s) && !d ? <Txt muted size={13}>{t("contrib.draftMissing")}</Txt> : null}
-              {s.state === "published" ? <Button small kind="secondary" title={t("contrib.view")} onPress={() => nav.push({ name: "story", storyId: s.storyId })} /> : null}
+              {canEdit(s) && d ? (
+                <Button
+                  small
+                  title={t("contrib.editResubmit")}
+                  onPress={() => nav.push({ name: "editor", draftId: d.localId })}
+                />
+              ) : null}
+              {canEdit(s) && !d ? (
+                <Txt muted size={13}>
+                  {t("contrib.draftMissing")}
+                </Txt>
+              ) : null}
+              {s.state === "published" ? (
+                <Button
+                  small
+                  kind="secondary"
+                  title={t("contrib.view")}
+                  onPress={() => nav.push({ name: "story", storyId: s.storyId })}
+                />
+              ) : null}
             </Card>
           );
         })}
@@ -149,7 +200,11 @@ export function InviteScreen({ link }: { link?: string }) {
       setDone(true);
     } catch (e) {
       if (e instanceof LockRequiredError) nav.push({ name: "pinSetup", then: { name: "invite", link: text } });
-      else Alert.alert(t("common.error"), e instanceof ApiError ? `${e.code}: ${e.message}` : e instanceof Error ? e.message : String(e));
+      else
+        Alert.alert(
+          t("common.error"),
+          e instanceof ApiError ? `${e.code}: ${e.message}` : e instanceof Error ? e.message : String(e),
+        );
     } finally {
       setBusy(false);
     }
@@ -158,7 +213,9 @@ export function InviteScreen({ link }: { link?: string }) {
     return (
       <Screen title={t("invite.title")}>
         <Notice tone="ok">{t("invite.done")}</Notice>
-        <Txt muted style={{ marginBottom: space.m }}>{t("invite.backup")}</Txt>
+        <Txt muted style={{ marginBottom: space.m }}>
+          {t("invite.backup")}
+        </Txt>
         <Button title={t("contrib.title")} onPress={() => nav.replace({ name: "contribute" })} />
       </Screen>
     );
@@ -170,12 +227,22 @@ export function InviteScreen({ link }: { link?: string }) {
       {parsed?.ok ? (
         <Notice tone="ok">
           <Txt>{t("invite.valid")}</Txt>
-          {parsed.content.note ? <Txt muted size={14}>{parsed.content.note}</Txt> : null}
-          {parsed.content.expiresAt ? <Txt muted size={14}>{t("invite.expires", { date: date(parsed.content.expiresAt) })}</Txt> : null}
+          {parsed.content.note ? (
+            <Txt muted size={14}>
+              {parsed.content.note}
+            </Txt>
+          ) : null}
+          {parsed.content.expiresAt ? (
+            <Txt muted size={14}>
+              {t("invite.expires", { date: date(parsed.content.expiresAt) })}
+            </Txt>
+          ) : null}
         </Notice>
       ) : null}
       <Button title={t("invite.redeem")} disabled={!parsed?.ok} busy={busy} onPress={() => void redeem()} />
-      <Txt muted size={13}>{t("invite.lockNote")}</Txt>
+      <Txt muted size={13}>
+        {t("invite.lockNote")}
+      </Txt>
     </Screen>
   );
 }
@@ -214,7 +281,11 @@ function LangFields({
 
 function MediaBadge({ m }: { m: StrippedMedia }) {
   const { t } = useI18n();
-  return m.metadataFree ? <Badge tone="ok" label={t("editor.metadataRemoved")} /> : <Badge tone="bad" label={t("editor.problem.metadata")} />;
+  return m.metadataFree ? (
+    <Badge tone="ok" label={t("editor.metadataRemoved")} />
+  ) : (
+    <Badge tone="bad" label={t("editor.problem.metadata")} />
+  );
 }
 
 export function EditorScreen({ draftId }: { draftId?: string }) {
@@ -253,17 +324,31 @@ export function EditorScreen({ draftId }: { draftId?: string }) {
     }, 400);
   };
 
-  if (!draft || !keys.loaded) return <Screen title={t("editor.title")}><Loading /></Screen>;
-  if (!kp) return <Screen title={t("editor.title")}><Notice>{t("contrib.inviteHelp")}</Notice></Screen>;
+  if (!draft || !keys.loaded)
+    return (
+      <Screen title={t("editor.title")}>
+        <Loading />
+      </Screen>
+    );
+  if (!kp)
+    return (
+      <Screen title={t("editor.title")}>
+        <Notice>{t("contrib.inviteHelp")}</Notice>
+      </Screen>
+    );
   const current = draft;
   const langs = draftLangs(draft.language);
   const workDir = joinPath(fs.paths.files, "drafts", draft.localId);
   const problems = validateDraft(draft, kp.npub, DEFAULT_MEDIA_LIMITS);
-  const setBlock = (i: number, b: DraftBlock) => update({ ...draft, blocks: draft.blocks.map((x, j) => (j === i ? b : x)) });
+  const setBlock = (i: number, b: DraftBlock) =>
+    update({ ...draft, blocks: draft.blocks.map((x, j) => (j === i ? b : x)) });
   const removeBlock = (i: number) => update({ ...draft, blocks: draft.blocks.filter((_, j) => j !== i) });
 
   const mediaError = (e: unknown) =>
-    Alert.alert(t("common.error"), e instanceof MediaError ? `${t(e.key)}\n${e.message}` : e instanceof Error ? e.message : String(e));
+    Alert.alert(
+      t("common.error"),
+      e instanceof MediaError ? `${t(e.key)}\n${e.message}` : e instanceof Error ? e.message : String(e),
+    );
 
   const addImages = async (i: number) => {
     const picked = await nativeDocuments.pick(["image/*"], true);
@@ -273,7 +358,11 @@ export function EditorScreen({ draftId }: { draftId?: string }) {
       const block = draft.blocks[i];
       if (block?.type !== "image") return;
       const items = [...block.items];
-      for (const p of picked) items.push({ media: await prepareImage(fs, services.mediaTools, p.uri, workDir, DEFAULT_MEDIA_LIMITS), caption: {} });
+      for (const p of picked)
+        items.push({
+          media: await prepareImage(fs, services.mediaTools, p.uri, workDir, DEFAULT_MEDIA_LIMITS),
+          caption: {},
+        });
       setBlock(i, { ...block, items });
     } catch (e) {
       mediaError(e);
@@ -289,7 +378,10 @@ export function EditorScreen({ draftId }: { draftId?: string }) {
     try {
       const block = draft.blocks[i];
       if (block?.type !== "video") return;
-      setBlock(i, { ...block, video: await prepareVideo(fs, services.mediaTools, p.uri, workDir, DEFAULT_MEDIA_LIMITS) });
+      setBlock(i, {
+        ...block,
+        video: await prepareVideo(fs, services.mediaTools, p.uri, workDir, DEFAULT_MEDIA_LIMITS),
+      });
     } catch (e) {
       mediaError(e);
     } finally {
@@ -336,7 +428,11 @@ export function EditorScreen({ draftId }: { draftId?: string }) {
       const prev = await drafts.get<UploadState>(stateKey);
       const media = draftMedia(draft);
       let state: UploadState;
-      if (prev && prev.phase !== "submitted" && JSON.stringify(prev.media.map((m) => m.sha256)) === JSON.stringify(media.map((m) => m.sha256))) {
+      if (
+        prev &&
+        prev.phase !== "submitted" &&
+        JSON.stringify(prev.media.map((m) => m.sha256)) === JSON.stringify(media.map((m) => m.sha256))
+      ) {
         state = prev;
       } else {
         state = newUploadState({
@@ -353,7 +449,19 @@ export function EditorScreen({ draftId }: { draftId?: string }) {
         // Media the server already holds from an earlier round (same file, same content key) is not sent again.
         for (const m of state.media) {
           const old = prev?.media.find((x) => x.sha256 === m.sha256 && x.done);
-          if (old) Object.assign(m, { headerB64: old.headerB64, chunks: old.chunks ?? [...Array(Math.max(1, Math.ceil(m.size / CHUNK_SIZE))).keys()].map((n) => ({ n, size: 0, sha256: "", path: "" })), done: true });
+          if (old)
+            Object.assign(m, {
+              headerB64: old.headerB64,
+              chunks:
+                old.chunks ??
+                [...Array(Math.max(1, Math.ceil(m.size / CHUNK_SIZE))).keys()].map((n) => ({
+                  n,
+                  size: 0,
+                  sha256: "",
+                  path: "",
+                })),
+              done: true,
+            });
         }
       }
       const final = await runUpload(
@@ -413,8 +521,12 @@ export function EditorScreen({ draftId }: { draftId?: string }) {
   return (
     <Screen title={draft.version > 1 ? t("editor.correctionTitle", { version: draft.version }) : t("editor.title")}>
       <Notice tone="ok">{t("editor.privacy")}</Notice>
-      <Txt muted size={13} style={{ marginBottom: space.m }}>{t("editor.autosave")}</Txt>
-      <Txt muted size={14}>{t("editor.language")}</Txt>
+      <Txt muted size={13} style={{ marginBottom: space.m }}>
+        {t("editor.autosave")}
+      </Txt>
+      <Txt muted size={14}>
+        {t("editor.language")}
+      </Txt>
       <Choice<StoryLanguage>
         value={draft.language}
         onChange={(language) => update({ ...draft, language })}
@@ -424,16 +536,38 @@ export function EditorScreen({ draftId }: { draftId?: string }) {
           { value: "both", label: t("editor.lang.both") },
         ]}
       />
-      <LangFields label={t("editor.storyTitle")} value={draft.title} onChange={(title) => update({ ...draft, title })} langs={langs} />
-      <LangFields label={t("editor.summary")} value={draft.summary} onChange={(summary) => update({ ...draft, summary })} langs={langs} multiline help={t("editor.summaryHelp")} />
+      <LangFields
+        label={t("editor.storyTitle")}
+        value={draft.title}
+        onChange={(title) => update({ ...draft, title })}
+        langs={langs}
+      />
+      <LangFields
+        label={t("editor.summary")}
+        value={draft.summary}
+        onChange={(summary) => update({ ...draft, summary })}
+        langs={langs}
+        multiline
+        help={t("editor.summaryHelp")}
+      />
       <Field
         label={t("editor.tags")}
         value={draft.tags.join(", ")}
         onChangeText={(s) => update({ ...draft, tags: s.split(",").map((x) => x.trimStart()) })}
         help={t("editor.tagsHelp", { max: 10 })}
       />
-      <LangFields label={t("editor.location")} value={draft.location} onChange={(location) => update({ ...draft, location })} langs={langs} help={t("editor.locationHelp")} />
-      <Field label={t("editor.penName")} value={draft.displayName} onChangeText={(displayName) => update({ ...draft, displayName })} />
+      <LangFields
+        label={t("editor.location")}
+        value={draft.location}
+        onChange={(location) => update({ ...draft, location })}
+        langs={langs}
+        help={t("editor.locationHelp")}
+      />
+      <Field
+        label={t("editor.penName")}
+        value={draft.displayName}
+        onChangeText={(displayName) => update({ ...draft, displayName })}
+      />
       <Section title={t("editor.cover")}>
         {draft.cover ? (
           <>
@@ -449,13 +583,21 @@ export function EditorScreen({ draftId }: { draftId?: string }) {
         {draft.blocks.map((b, i) => (
           <Card key={b.id}>
             <Row>
-              <Txt bold style={{ flex: 1 }}>{t(`editor.block.${b.type}`)}</Txt>
+              <Txt bold style={{ flex: 1 }}>
+                {t(`editor.block.${b.type}`)}
+              </Txt>
               <Button small kind="link" title="↑" onPress={() => update(moveBlock(draft, i, -1))} />
               <Button small kind="link" title="↓" onPress={() => update(moveBlock(draft, i, 1))} />
               <Button small kind="link" title={t("editor.remove")} onPress={() => removeBlock(i)} />
             </Row>
             {b.type === "text" ? (
-              <LangFields label={t("editor.markdown")} value={b.markdown} onChange={(markdown) => setBlock(i, { ...b, markdown })} langs={langs} multiline />
+              <LangFields
+                label={t("editor.markdown")}
+                value={b.markdown}
+                onChange={(markdown) => setBlock(i, { ...b, markdown })}
+                langs={langs}
+                multiline
+              />
             ) : null}
             {b.type === "image" ? (
               <>
@@ -466,12 +608,24 @@ export function EditorScreen({ draftId }: { draftId?: string }) {
                     <LangFields
                       label={t("editor.caption")}
                       value={it.caption}
-                      onChange={(caption) => setBlock(i, { ...b, items: b.items.map((x, k) => (k === j ? { ...x, caption } : x)) })}
+                      onChange={(caption) =>
+                        setBlock(i, { ...b, items: b.items.map((x, k) => (k === j ? { ...x, caption } : x)) })
+                      }
                       langs={langs}
                     />
                     <Row>
-                      <Button small kind="link" title={t("editor.useAsCover")} onPress={() => update({ ...draft, cover: it.media })} />
-                      <Button small kind="link" title={t("editor.remove")} onPress={() => setBlock(i, { ...b, items: b.items.filter((_, k) => k !== j) })} />
+                      <Button
+                        small
+                        kind="link"
+                        title={t("editor.useAsCover")}
+                        onPress={() => update({ ...draft, cover: it.media })}
+                      />
+                      <Button
+                        small
+                        kind="link"
+                        title={t("editor.remove")}
+                        onPress={() => setBlock(i, { ...b, items: b.items.filter((_, k) => k !== j) })}
+                      />
                     </Row>
                   </View>
                 ))}
@@ -488,13 +642,29 @@ export function EditorScreen({ draftId }: { draftId?: string }) {
                 ) : (
                   <Button small kind="secondary" title={t("editor.chooseVideo")} onPress={() => void pickVideo(i)} />
                 )}
-                <LangFields label={t("editor.videoTitle")} value={b.title} onChange={(title) => setBlock(i, { ...b, title })} langs={langs} />
-                <LangFields label={t("editor.videoDescription")} value={b.description} onChange={(description) => setBlock(i, { ...b, description })} langs={langs} multiline />
+                <LangFields
+                  label={t("editor.videoTitle")}
+                  value={b.title}
+                  onChange={(title) => setBlock(i, { ...b, title })}
+                  langs={langs}
+                />
+                <LangFields
+                  label={t("editor.videoDescription")}
+                  value={b.description}
+                  onChange={(description) => setBlock(i, { ...b, description })}
+                  langs={langs}
+                  multiline
+                />
               </>
             ) : null}
             {b.type === "embed-story" ? (
               <>
-                <Field label={t("editor.embedId")} value={b.storyId} onChangeText={(storyId) => setBlock(i, { ...b, storyId })} autoCapitalize="none" />
+                <Field
+                  label={t("editor.embedId")}
+                  value={b.storyId}
+                  onChangeText={(storyId) => setBlock(i, { ...b, storyId })}
+                  autoCapitalize="none"
+                />
                 <Field
                   label={t("editor.embedVersion")}
                   value={b.version ? String(b.version) : ""}
@@ -516,12 +686,25 @@ export function EditorScreen({ draftId }: { draftId?: string }) {
         <Notice tone="bad">
           <Txt bold>{t("editor.fixErrors")}</Txt>
           {problems.map((p, i) => (
-            <Txt key={i} size={14}>• {p.detail ?? t(p.key, p.vars)}</Txt>
+            <Txt key={i} size={14}>
+              • {p.detail ?? t(p.key, p.vars)}
+            </Txt>
           ))}
         </Notice>
       ) : null}
       {error ? <Notice tone="bad">{error}</Notice> : null}
-      {working ? <Loading label={progress ? t(`editor.progress.${progress.phase === "uploading" ? "uploading" : "encrypting"}`, { done: progress.sentChunks, total: progress.totalChunks }) : working} /> : null}
+      {working ? (
+        <Loading
+          label={
+            progress
+              ? t(`editor.progress.${progress.phase === "uploading" ? "uploading" : "encrypting"}`, {
+                  done: progress.sentChunks,
+                  total: progress.totalChunks,
+                })
+              : working
+          }
+        />
+      ) : null}
       <Button title={t("editor.submit")} busy={!!working} onPress={() => void submit()} />
     </Screen>
   );

@@ -343,7 +343,10 @@ export class AppData {
     }
     let bytes: Uint8Array;
     try {
-      bytes = await this.gateways.fetchBySha({ cid: ref.manifestCid, sha256: ref.manifestSha256 }, { maxBytes: MANIFEST_MAX });
+      bytes = await this.gateways.fetchBySha(
+        { cid: ref.manifestCid, sha256: ref.manifestSha256 },
+        { maxBytes: MANIFEST_MAX },
+      );
     } catch (e) {
       // IPFS failed everywhere: look for the Arweave copy via the storage receipt (decision D3).
       const receipt = await this.storageReceipt(ref.storyId, ref.version);

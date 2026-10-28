@@ -34,15 +34,36 @@ describe("English and Hindi strings", () => {
     for (const f of files(SRC)) {
       const text = readFileSync(f, "utf8");
       for (const m of text.matchAll(/\bt\(\s*"([a-z][\w.-]+)"/g)) if (!known.has(m[1]!)) missing.push(`${f}: ${m[1]}`);
-      for (const m of text.matchAll(/new (?:Media|Bundle|Update)Error\(\s*"([\w.-]+)"/g)) if (!known.has(m[1]!)) missing.push(`${f}: ${m[1]}`);
-      for (const m of text.matchAll(/key: "([a-z][\w.-]+)"/g)) if (m[1]!.includes(".") && !known.has(m[1]!)) missing.push(`${f}: ${m[1]}`);
+      for (const m of text.matchAll(/new (?:Media|Bundle|Update)Error\(\s*"([\w.-]+)"/g))
+        if (!known.has(m[1]!)) missing.push(`${f}: ${m[1]}`);
+      for (const m of text.matchAll(/key: "([a-z][\w.-]+)"/g))
+        if (m[1]!.includes(".") && !known.has(m[1]!)) missing.push(`${f}: ${m[1]}`);
     }
     expect(missing).toEqual([]);
     // keys built at run time
-    for (const p of ["submission.state.", "tor.state.", "verify.chainError.", "verify.arweave.", "editor.block.", "moderate.confirm.", "moderate.confirmBody."])
+    for (const p of [
+      "submission.state.",
+      "tor.state.",
+      "verify.chainError.",
+      "verify.arweave.",
+      "editor.block.",
+      "moderate.confirm.",
+      "moderate.confirmBody.",
+    ])
       expect(Object.keys(en).some((k) => k.startsWith(p))).toBe(true);
-    for (const s of ["draft", "submitted", "in_review", "changes_requested", "rejected", "approved", "publishing", "published", "unlisted"])
+    for (const s of [
+      "draft",
+      "submitted",
+      "in_review",
+      "changes_requested",
+      "rejected",
+      "approved",
+      "publishing",
+      "published",
+      "unlisted",
+    ])
       expect(known.has(`submission.state.${s}`)).toBe(true);
-    for (const s of ["not-found", "mismatch", "unreachable", "not-publisher"]) expect(known.has(`verify.chainError.${s}`)).toBe(true);
+    for (const s of ["not-found", "mismatch", "unreachable", "not-publisher"])
+      expect(known.has(`verify.chainError.${s}`)).toBe(true);
   });
 });

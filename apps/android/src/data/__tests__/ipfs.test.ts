@@ -53,7 +53,9 @@ function source(tamper: Set<string>, reports: BlockReport[] = []): BlockSource {
 describe("trustless IPFS", () => {
   it("parses CIDs and computes raw-leaf CIDs like Kubo", () => {
     expect(parseCid(file).string).toBe(file);
-    expect(rawCidOf(new TextEncoder().encode("hello"))).toBe("bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq");
+    expect(rawCidOf(new TextEncoder().encode("hello"))).toBe(
+      "bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq",
+    );
     expect(() => parseCid("Qm123")).toThrow();
   });
 
@@ -61,7 +63,9 @@ describe("trustless IPFS", () => {
     const reports: BlockReport[] = [];
     expect(await fetchFileByCid(file, source(new Set(["https://evil.example"]), reports))).toEqual(cat(a, b));
     expect(reports.some((r) => r.reason === "mismatch" && r.base === "https://evil.example")).toBe(true);
-    await expect(fetchFileByCid(file, source(new Set(["https://evil.example", "https://good.example"])))).rejects.toThrow(/verified block/);
+    await expect(
+      fetchFileByCid(file, source(new Set(["https://evil.example", "https://good.example"]))),
+    ).rejects.toThrow(/verified block/);
   });
 
   it("resolves paths through directories and enforces size limits", async () => {

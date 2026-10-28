@@ -24,7 +24,12 @@ export interface NetSettings {
   autoEnabled: boolean;
 }
 
-export const DEFAULT_NET_SETTINGS: NetSettings = { torEnabled: false, bridges: "snowflake", autoTor: true, autoEnabled: false };
+export const DEFAULT_NET_SETTINGS: NetSettings = {
+  torEnabled: false,
+  bridges: "snowflake",
+  autoTor: true,
+  autoEnabled: false,
+};
 
 export interface Reachability {
   relays: { url: string; ok: boolean }[];
@@ -76,7 +81,10 @@ export async function checkReachability(
   const [r, g] = await Promise.all([
     Promise.all(relays.map(async (url) => ({ url, ok: await probes.relay(url, timeoutMs).catch(() => false) }))),
     Promise.all(
-      gateways.map(async (gw) => ({ url: gw.url, ok: await probes.gateway(gw.url, gw.network, timeoutMs).catch(() => false) })),
+      gateways.map(async (gw) => ({
+        url: gw.url,
+        ok: await probes.gateway(gw.url, gw.network, timeoutMs).catch(() => false),
+      })),
     ),
   ]);
   return { relays: r, gateways: g, at: Date.now() };

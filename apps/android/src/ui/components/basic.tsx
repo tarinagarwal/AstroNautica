@@ -39,13 +39,24 @@ export function Txt({
   lang?: "en" | "hi";
 }) {
   const { font, lang: ui } = useI18n();
-  const family = lang ? (lang === "hi" ? "NotoSansDevanagari" : "NotoSans") : typeof children === "string" ? fontForText(children, ui) : font;
+  const family = lang
+    ? lang === "hi"
+      ? "NotoSansDevanagari"
+      : "NotoSans"
+    : typeof children === "string"
+      ? fontForText(children, ui)
+      : font;
   return (
     <Text
       selectable={selectable}
       numberOfLines={numberOfLines}
       style={[
-        { fontFamily: family, color: muted ? colors.muted : colors.text, fontSize: size ?? 16, lineHeight: (size ?? 16) * 1.45 },
+        {
+          fontFamily: family,
+          color: muted ? colors.muted : colors.text,
+          fontSize: size ?? 16,
+          lineHeight: (size ?? 16) * 1.45,
+        },
         bold && { fontWeight: "700" },
         style,
       ]}
@@ -72,8 +83,22 @@ export function Button({
   style?: StyleProp<ViewStyle>;
   small?: boolean;
 }) {
-  const bg = kind === "primary" ? colors.primary : kind === "danger" ? colors.badBg : kind === "link" ? "transparent" : colors.card;
-  const fg = kind === "primary" ? colors.primaryText : kind === "danger" ? colors.bad : kind === "link" ? colors.link : colors.text;
+  const bg =
+    kind === "primary"
+      ? colors.primary
+      : kind === "danger"
+        ? colors.badBg
+        : kind === "link"
+          ? "transparent"
+          : colors.card;
+  const fg =
+    kind === "primary"
+      ? colors.primaryText
+      : kind === "danger"
+        ? colors.bad
+        : kind === "link"
+          ? colors.link
+          : colors.text;
   return (
     <Pressable
       accessibilityRole="button"
@@ -82,11 +107,21 @@ export function Button({
       style={({ pressed }) => [
         styles.button,
         small && styles.buttonSmall,
-        { backgroundColor: bg, borderColor: kind === "secondary" ? colors.border : bg, opacity: disabled ? 0.45 : pressed ? 0.8 : 1 },
+        {
+          backgroundColor: bg,
+          borderColor: kind === "secondary" ? colors.border : bg,
+          opacity: disabled ? 0.45 : pressed ? 0.8 : 1,
+        },
         style,
       ]}
     >
-      {busy ? <ActivityIndicator color={fg} /> : <Txt style={{ color: fg, textAlign: "center" }} bold={kind !== "link"} size={small ? 14 : 16}>{title}</Txt>}
+      {busy ? (
+        <ActivityIndicator color={fg} />
+      ) : (
+        <Txt style={{ color: fg, textAlign: "center" }} bold={kind !== "link"} size={small ? 14 : 16}>
+          {title}
+        </Txt>
+      )}
     </Pressable>
   );
 }
@@ -98,11 +133,21 @@ export function Header({ title, right }: { title: string; right?: ReactNode }) {
   return (
     <View style={[styles.header, { paddingTop: insets.top + space.s }]}>
       {nav.depth > 1 ? (
-        <Pressable accessibilityRole="button" accessibilityLabel={t("common.back")} onPress={() => nav.back()} style={styles.headerBtn}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("common.back")}
+          onPress={() => nav.back()}
+          style={styles.headerBtn}
+        >
           <Txt size={22}>‹</Txt>
         </Pressable>
       ) : (
-        <Pressable accessibilityRole="button" accessibilityLabel={t("nav.menu")} onPress={() => nav.push({ name: "menu" })} style={styles.headerBtn}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("nav.menu")}
+          onPress={() => nav.push({ name: "menu" })}
+          style={styles.headerBtn}
+        >
           <Txt size={22}>☰</Txt>
         </Pressable>
       )}
@@ -124,13 +169,26 @@ export function Header({ title, right }: { title: string; right?: ReactNode }) {
   );
 }
 
-export function Screen({ title, children, scroll = true, right }: { title: string; children: ReactNode; scroll?: boolean; right?: ReactNode }) {
+export function Screen({
+  title,
+  children,
+  scroll = true,
+  right,
+}: {
+  title: string;
+  children: ReactNode;
+  scroll?: boolean;
+  right?: ReactNode;
+}) {
   const insets = useSafeAreaInsets();
   return (
     <View style={styles.screen}>
       <Header title={title} right={right} />
       {scroll ? (
-        <ScrollView contentContainerStyle={{ padding: space.l, paddingBottom: insets.bottom + space.xl }} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={{ padding: space.l, paddingBottom: insets.bottom + space.xl }}
+          keyboardShouldPersistTaps="handled"
+        >
           {children}
         </ScrollView>
       ) : (
@@ -140,7 +198,15 @@ export function Screen({ title, children, scroll = true, right }: { title: strin
   );
 }
 
-export function Card({ children, style, onPress }: { children: ReactNode; style?: StyleProp<ViewStyle>; onPress?: () => void }) {
+export function Card({
+  children,
+  style,
+  onPress,
+}: {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  onPress?: () => void;
+}) {
   if (onPress)
     return (
       <Pressable onPress={onPress} style={({ pressed }) => [styles.card, { opacity: pressed ? 0.85 : 1 }, style]}>
@@ -174,7 +240,12 @@ export function Field(props: TextInputProps & { label: string; help?: string }) 
       <TextInput
         accessibilityLabel={label}
         placeholderTextColor={colors.muted}
-        style={[styles.input, { fontFamily: font }, rest.multiline && { minHeight: 96, textAlignVertical: "top" }, style]}
+        style={[
+          styles.input,
+          { fontFamily: font },
+          rest.multiline && { minHeight: 96, textAlignVertical: "top" },
+          style,
+        ]}
         {...rest}
       />
       {help ? (
@@ -187,7 +258,8 @@ export function Field(props: TextInputProps & { label: string; help?: string }) 
 }
 
 export function Badge({ label, tone }: { label: string; tone: "ok" | "bad" | "neutral" | "warn" }) {
-  const bg = tone === "ok" ? colors.okBg : tone === "bad" ? colors.badBg : tone === "warn" ? colors.warnBg : colors.code;
+  const bg =
+    tone === "ok" ? colors.okBg : tone === "bad" ? colors.badBg : tone === "warn" ? colors.warnBg : colors.code;
   const fg = tone === "ok" ? colors.ok : tone === "bad" ? colors.bad : colors.text;
   return (
     <View style={[styles.badge, { backgroundColor: bg }]}>
@@ -200,19 +272,42 @@ export function Badge({ label, tone }: { label: string; tone: "ok" | "bad" | "ne
 
 export function Notice({ children, tone = "warn" }: { children: ReactNode; tone?: "ok" | "bad" | "warn" }) {
   const bg = tone === "ok" ? colors.okBg : tone === "bad" ? colors.badBg : colors.warnBg;
-  return <View style={[styles.notice, { backgroundColor: bg }]}>{typeof children === "string" ? <Txt size={15}>{children}</Txt> : children}</View>;
+  return (
+    <View style={[styles.notice, { backgroundColor: bg }]}>
+      {typeof children === "string" ? <Txt size={15}>{children}</Txt> : children}
+    </View>
+  );
 }
 
 export function Row({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  return <View style={[{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: space.s }, style]}>{children}</View>;
+  return (
+    <View style={[{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: space.s }, style]}>
+      {children}
+    </View>
+  );
 }
 
-export function Toggle({ label, value, onChange, help }: { label: string; value: boolean; onChange: (v: boolean) => void; help?: string }) {
+export function Toggle({
+  label,
+  value,
+  onChange,
+  help,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+  help?: string;
+}) {
   return (
     <View style={{ marginBottom: space.m }}>
       <View style={{ flexDirection: "row", alignItems: "center" }}>
         <Txt style={{ flex: 1 }}>{label}</Txt>
-        <Switch accessibilityLabel={label} value={value} onValueChange={onChange} trackColor={{ true: colors.primary, false: colors.border }} />
+        <Switch
+          accessibilityLabel={label}
+          value={value}
+          onValueChange={onChange}
+          trackColor={{ true: colors.primary, false: colors.border }}
+        />
       </View>
       {help ? (
         <Txt muted size={13}>
@@ -236,7 +331,15 @@ export function Loading({ label }: { label?: string }) {
   );
 }
 
-export function Choice<T extends string>({ options, value, onChange }: { options: { value: T; label: string }[]; value: T; onChange: (v: T) => void }) {
+export function Choice<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
   return (
     <Row style={{ marginBottom: space.m }}>
       {options.map((o) => (
@@ -268,12 +371,49 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     gap: space.s,
   },
-  headerBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center", paddingHorizontal: space.s },
-  button: { paddingVertical: space.m, paddingHorizontal: space.l, borderRadius: 8, borderWidth: 1, minHeight: 48, justifyContent: "center", marginVertical: space.xs },
+  headerBtn: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: space.s,
+  },
+  button: {
+    paddingVertical: space.m,
+    paddingHorizontal: space.l,
+    borderRadius: 8,
+    borderWidth: 1,
+    minHeight: 48,
+    justifyContent: "center",
+    marginVertical: space.xs,
+  },
   buttonSmall: { paddingVertical: space.s, paddingHorizontal: space.m, minHeight: 40 },
-  card: { backgroundColor: colors.card, borderRadius: 10, padding: space.l, marginBottom: space.m, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
-  input: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: space.m, paddingVertical: space.s, fontSize: 16, color: colors.text, backgroundColor: colors.card },
+  card: {
+    backgroundColor: colors.card,
+    borderRadius: 10,
+    padding: space.l,
+    marginBottom: space.m,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: space.m,
+    paddingVertical: space.s,
+    fontSize: 16,
+    color: colors.text,
+    backgroundColor: colors.card,
+  },
   badge: { paddingHorizontal: space.s, paddingVertical: 2, borderRadius: 6, alignSelf: "flex-start" },
   notice: { padding: space.m, borderRadius: 8, marginBottom: space.m },
-  choice: { borderWidth: 1, borderColor: colors.border, borderRadius: 20, paddingHorizontal: space.m, paddingVertical: space.s, backgroundColor: colors.card },
+  choice: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 20,
+    paddingHorizontal: space.m,
+    paddingVertical: space.s,
+    backgroundColor: colors.card,
+  },
 });

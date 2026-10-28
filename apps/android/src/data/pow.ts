@@ -14,12 +14,22 @@ export interface NativeMiner {
 }
 
 /** The exact string nostr-tools hashes for an event id (NIP-01 serialisation). */
-export function serializeForId(e: { pubkey: string; created_at: number; kind: number; tags: string[][]; content: string }): string {
+export function serializeForId(e: {
+  pubkey: string;
+  created_at: number;
+  kind: number;
+  tags: string[][];
+  content: string;
+}): string {
   return JSON.stringify([0, e.pubkey, e.created_at, e.kind, e.tags, e.content]);
 }
 
 /** Split the serialisation around the nonce value so prefix + nonce + suffix is exactly what gets hashed. */
-export function powParts(template: EventTemplate, pubkey: string, difficulty: number): { prefix: string; suffix: string; tags: (n: string) => string[][] } {
+export function powParts(
+  template: EventTemplate,
+  pubkey: string,
+  difficulty: number,
+): { prefix: string; suffix: string; tags: (n: string) => string[][] } {
   const base = template.tags.filter((t) => t[0] !== "nonce");
   let marker = "AZAAD_NONCE_PLACEHOLDER";
   while (JSON.stringify(template).includes(marker)) marker += "_";

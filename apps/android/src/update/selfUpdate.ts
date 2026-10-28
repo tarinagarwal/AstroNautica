@@ -47,12 +47,18 @@ export function checkApk(info: ApkInfo, release: AndroidRelease, installed: Inst
   if (info.packageName !== installed.packageName)
     throw new UpdateError("update.error.package", `the file is a different app (${info.packageName})`);
   if (info.versionCode !== release.versionCode)
-    throw new UpdateError("update.error.version", `the file is version ${info.versionCode}, the list says ${release.versionCode}`);
+    throw new UpdateError(
+      "update.error.version",
+      `the file is version ${info.versionCode}, the list says ${release.versionCode}`,
+    );
   if (info.versionCode <= installed.versionCode)
     throw new UpdateError("update.error.version", "the file is not newer than the installed app");
   const certs = info.certSha256.map((c) => c.toLowerCase());
   if (!certs.includes(release.signingCertSha256.toLowerCase()))
-    throw new UpdateError("update.error.cert", "the file's signing certificate is not the one on the signed release list");
+    throw new UpdateError(
+      "update.error.cert",
+      "the file's signing certificate is not the one on the signed release list",
+    );
   if (!certs.some((c) => ownCerts.map((o) => o.toLowerCase()).includes(c)))
     throw new UpdateError("update.error.cert", "the file is not signed with this app's certificate");
 }
@@ -85,7 +91,8 @@ export async function downloadRelease(args: {
           signal: args.signal,
           timeoutMs: 120_000,
         });
-        if (r.size !== release.size) throw new UpdateError("update.error.size", "downloaded size differs from the list");
+        if (r.size !== release.size)
+          throw new UpdateError("update.error.size", "downloaded size differs from the list");
         ok = true;
         break;
       } catch (e) {
@@ -93,7 +100,10 @@ export async function downloadRelease(args: {
         if (args.signal?.aborted) throw e;
       }
     }
-    if (!ok) throw last instanceof UpdateError ? last : new UpdateError("update.error.download", String((last as Error)?.message ?? last));
+    if (!ok)
+      throw last instanceof UpdateError
+        ? last
+        : new UpdateError("update.error.download", String((last as Error)?.message ?? last));
   }
   const [info, own] = await Promise.all([args.inspector.apkInfo(dest), args.inspector.ownCertSha256()]);
   try {

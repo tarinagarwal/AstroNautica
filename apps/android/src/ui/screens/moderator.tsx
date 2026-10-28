@@ -7,7 +7,16 @@ import { ApiError, type MediaMeta, type QueueItem } from "../../api/client";
 import { signerFromSecret } from "../../api/nip98";
 import { syncContributors } from "../../moderator/actions";
 import { previewMedia } from "../../moderator/preview";
-import { approve, claim, identityFrom, openSubmission, rejectSubmission, requestChanges, rewrapPending, type OpenedSubmission } from "../../moderator/review";
+import {
+  approve,
+  claim,
+  identityFrom,
+  openSubmission,
+  rejectSubmission,
+  requestChanges,
+  rewrapPending,
+  type OpenedSubmission,
+} from "../../moderator/review";
 import { nativeDocuments } from "../../platform/nativeFiles";
 import { joinPath } from "../../platform/types";
 import { LockRequiredError } from "../../security/keys";
@@ -22,7 +31,10 @@ function useModerator() {
   const { keys } = useServices();
   useObservable(keys);
   const m = keys.loaded ? keys.moderator() : undefined;
-  return useMemo(() => (m ? identityFrom(m.keys.secretKey, m.x25519) : undefined), [m?.keys.pubkey, m?.x25519.publicKey]); // eslint-disable-line
+  return useMemo(
+    () => (m ? identityFrom(m.keys.secretKey, m.x25519) : undefined),
+    [m?.keys.pubkey, m?.x25519.publicKey],
+  );
 }
 
 export function ModerateScreen() {
@@ -51,20 +63,37 @@ export function ModerateScreen() {
       ]);
       const rewrapped = await rewrapPending(api, me, allowed).catch(() => []);
       if ((sync && (sync.added.length || sync.revoked.length)) || rewrapped.length)
-        setInfo(t("moderate.synced", { added: sync?.added.length ?? 0, revoked: sync?.revoked.length ?? 0, rewrapped: rewrapped.length }));
+        setInfo(
+          t("moderate.synced", {
+            added: sync?.added.length ?? 0,
+            revoked: sync?.revoked.length ?? 0,
+            rewrapped: rewrapped.length,
+          }),
+        );
     } catch (e) {
       setError(e instanceof ApiError ? `${e.code}: ${e.message}` : String(e));
     }
   }, [api, me, app, t]);
   useEffect(() => void load(), [load]);
 
-  if (!keys.loaded) return <Screen title={t("moderate.title")}><Notice>{t("keys.locked")}</Notice></Screen>;
+  if (!keys.loaded)
+    return (
+      <Screen title={t("moderate.title")}>
+        <Notice>{t("keys.locked")}</Notice>
+      </Screen>
+    );
   if (!me)
     return (
       <Screen title={t("moderate.title")}>
         <Txt style={{ marginBottom: space.m }}>{t("moderate.loginHelp")}</Txt>
         <Field label={t("moderate.nsec")} value={nsec} onChangeText={setNsec} autoCapitalize="none" secureTextEntry />
-        <Field label={t("moderate.x25519")} value={x25519} onChangeText={setX25519} autoCapitalize="none" secureTextEntry />
+        <Field
+          label={t("moderate.x25519")}
+          value={x25519}
+          onChangeText={setX25519}
+          autoCapitalize="none"
+          secureTextEntry
+        />
         <Button
           title={t("moderate.login")}
           disabled={!nsec || !x25519}
@@ -77,7 +106,10 @@ export function ModerateScreen() {
                 if (!listed) Alert.alert(t("moderate.notListed"));
                 else if (listed.x25519 !== r.x25519) Alert.alert(t("moderate.x25519Mismatch"));
               },
-              (e) => (e instanceof LockRequiredError ? nav.push({ name: "pinSetup", then: { name: "moderate" } }) : Alert.alert(t("common.error"), String(e))),
+              (e) =>
+                e instanceof LockRequiredError
+                  ? nav.push({ name: "pinSetup", then: { name: "moderate" } })
+                  : Alert.alert(t("common.error"), String(e)),
             )
           }
         />
@@ -95,14 +127,22 @@ export function ModerateScreen() {
         {queue?.map((q) => (
           <Card key={q.id} onPress={() => nav.push({ name: "review", submissionId: q.id })}>
             <Row>
-              <Txt bold style={{ flex: 1 }}>{q.storyId.slice(0, 13)}… v{q.version}</Txt>
+              <Txt bold style={{ flex: 1 }}>
+                {q.storyId.slice(0, 13)}… v{q.version}
+              </Txt>
               <Badge tone={q.state === "in_review" ? "warn" : "neutral"} label={t(`submission.state.${q.state}`)} />
             </Row>
             <Txt muted size={13}>
               {q.submittedAt ? t("moderate.submitted", { date: date(q.submittedAt, true) }) : ""}
-              {q.claimBy ? ` · ${t("moderate.claimedBy", { who: q.claimBy === me.pubkey ? t("moderate.you") : q.claimBy.slice(0, 8) })}` : ""}
+              {q.claimBy
+                ? ` · ${t("moderate.claimedBy", { who: q.claimBy === me.pubkey ? t("moderate.you") : q.claimBy.slice(0, 8) })}`
+                : ""}
             </Txt>
-            {q.wrappedForMe === false ? <Txt muted size={13}>{t("moderate.noWrap")}</Txt> : null}
+            {q.wrappedForMe === false ? (
+              <Txt muted size={13}>
+                {t("moderate.noWrap")}
+              </Txt>
+            ) : null}
           </Card>
         ))}
         <Button kind="secondary" title={t("common.refresh")} onPress={() => void load()} />
@@ -144,19 +184,33 @@ function MediaPreview({ opened, sha, kind }: { opened: OpenedSubmission; sha: st
   };
   useEffect(() => {
     if (kind === "image") void load();
-  }, [sha]); // eslint-disable-line
+  }, [sha]);
   if (!meta) return <Notice tone="bad">{t("moderate.mediaMissing")}</Notice>;
   if (error) return <Notice tone="bad">{error}</Notice>;
   if (!path)
     return kind === "video" ? (
-      <Button small kind="secondary" title={progress ? t("moderate.decrypting", { progress }) : t("moderate.previewVideo", { mb: Math.round(meta.size / 1024 / 1024) })} onPress={() => void load()} />
+      <Button
+        small
+        kind="secondary"
+        title={
+          progress
+            ? t("moderate.decrypting", { progress })
+            : t("moderate.previewVideo", { mb: Math.round(meta.size / 1024 / 1024) })
+        }
+        onPress={() => void load()}
+      />
     ) : (
       <Loading label={progress} />
     );
   return kind === "image" ? (
     <LocalImage path={path} />
   ) : (
-    <Video source={{ uri: `file://${path}` }} controls style={{ width: "100%", aspectRatio: 16 / 9, backgroundColor: "#000" }} resizeMode="contain" />
+    <Video
+      source={{ uri: `file://${path}` }}
+      controls
+      style={{ width: "100%", aspectRatio: 16 / 9, backgroundColor: "#000" }}
+      resizeMode="contain"
+    />
   );
 }
 
@@ -167,10 +221,18 @@ function BodyPreview({ opened }: { opened: OpenedSubmission }) {
   const [lang, setLang] = useState<Lang>(langs[0]!);
   return (
     <View>
-      {langs.length > 1 ? <Choice value={lang} onChange={setLang} options={langs.map((l) => ({ value: l, label: t(`lang.${l}`) }))} /> : null}
-      <Txt bold size={22} lang={lang}>{pickText(body.title, lang)}</Txt>
-      <Txt muted size={14}>{t("story.by", { name: body.contributor.displayName })}</Txt>
-      <Txt style={{ fontStyle: "italic", marginVertical: space.m }} lang={lang}>{pickText(body.summary, lang)}</Txt>
+      {langs.length > 1 ? (
+        <Choice value={lang} onChange={setLang} options={langs.map((l) => ({ value: l, label: t(`lang.${l}`) }))} />
+      ) : null}
+      <Txt bold size={22} lang={lang}>
+        {pickText(body.title, lang)}
+      </Txt>
+      <Txt muted size={14}>
+        {t("story.by", { name: body.contributor.displayName })}
+      </Txt>
+      <Txt style={{ fontStyle: "italic", marginVertical: space.m }} lang={lang}>
+        {pickText(body.summary, lang)}
+      </Txt>
       {body.cover ? <MediaPreview opened={opened} sha={body.cover.sha256} kind="image" /> : null}
       {body.blocks.map((b, i) => (
         <View key={i} style={{ marginBottom: space.m }}>
@@ -179,7 +241,11 @@ function BodyPreview({ opened }: { opened: OpenedSubmission }) {
             ? b.items.map((it) => (
                 <View key={it.sha256} style={{ marginBottom: space.s }}>
                   <MediaPreview opened={opened} sha={it.sha256} kind="image" />
-                  {it.caption ? <Txt muted size={14}>{pickText(it.caption, lang)}</Txt> : null}
+                  {it.caption ? (
+                    <Txt muted size={14}>
+                      {pickText(it.caption, lang)}
+                    </Txt>
+                  ) : null}
                 </View>
               ))
             : null}
@@ -187,14 +253,33 @@ function BodyPreview({ opened }: { opened: OpenedSubmission }) {
             <>
               {b.title ? <Txt bold>{pickText(b.title, lang)}</Txt> : null}
               <MediaPreview opened={opened} sha={b.source.sha256} kind="video" />
-              {b.description ? <Txt muted size={14}>{pickText(b.description, lang)}</Txt> : null}
+              {b.description ? (
+                <Txt muted size={14}>
+                  {pickText(b.description, lang)}
+                </Txt>
+              ) : null}
             </>
           ) : null}
-          {b.type === "embed-story" ? <Card><Txt>{t("embed.label")}: {b.storyId}{b.version ? ` v${b.version}` : ""}</Txt></Card> : null}
+          {b.type === "embed-story" ? (
+            <Card>
+              <Txt>
+                {t("embed.label")}: {b.storyId}
+                {b.version ? ` v${b.version}` : ""}
+              </Txt>
+            </Card>
+          ) : null}
         </View>
       ))}
-      {body.tags.length ? <Txt muted size={14}>{body.tags.map((x) => `#${x}`).join(" ")}</Txt> : null}
-      {body.location ? <Txt muted size={14}>{pickText(body.location, lang)}</Txt> : null}
+      {body.tags.length ? (
+        <Txt muted size={14}>
+          {body.tags.map((x) => `#${x}`).join(" ")}
+        </Txt>
+      ) : null}
+      {body.location ? (
+        <Txt muted size={14}>
+          {pickText(body.location, lang)}
+        </Txt>
+      ) : null}
     </View>
   );
 }
@@ -229,9 +314,24 @@ export function ReviewScreen({ submissionId }: { submissionId: string }) {
     };
   }, [api, me, submissionId]);
 
-  if (!me || !api) return <Screen title={t("moderate.review")}><Notice>{t("keys.locked")}</Notice></Screen>;
-  if (error) return <Screen title={t("moderate.review")}><Notice tone="bad">{error}</Notice></Screen>;
-  if (!opened) return <Screen title={t("moderate.review")}><Loading label={t("moderate.decryptingBody")} /></Screen>;
+  if (!me || !api)
+    return (
+      <Screen title={t("moderate.review")}>
+        <Notice>{t("keys.locked")}</Notice>
+      </Screen>
+    );
+  if (error)
+    return (
+      <Screen title={t("moderate.review")}>
+        <Notice tone="bad">{error}</Notice>
+      </Screen>
+    );
+  if (!opened)
+    return (
+      <Screen title={t("moderate.review")}>
+        <Loading label={t("moderate.decryptingBody")} />
+      </Screen>
+    );
 
   const act = async (kind: "approve" | "reject" | "changes") => {
     setBusy(kind);
@@ -244,7 +344,10 @@ export function ReviewScreen({ submissionId }: { submissionId: string }) {
       Alert.alert(t("moderate.done"));
       nav.back();
     } catch (e) {
-      Alert.alert(t("common.error"), e instanceof ApiError ? `${e.code}: ${e.message}` : e instanceof Error ? e.message : String(e));
+      Alert.alert(
+        t("common.error"),
+        e instanceof ApiError ? `${e.code}: ${e.message}` : e instanceof Error ? e.message : String(e),
+      );
     } finally {
       setBusy(null);
     }
@@ -261,7 +364,9 @@ export function ReviewScreen({ submissionId }: { submissionId: string }) {
         <Notice tone="bad">
           <Txt bold>{t("moderate.problems")}</Txt>
           {opened.problems.map((p) => (
-            <Txt key={p} size={13}>• {p}</Txt>
+            <Txt key={p} size={13}>
+              • {p}
+            </Txt>
           ))}
         </Notice>
       ) : (
@@ -271,11 +376,34 @@ export function ReviewScreen({ submissionId }: { submissionId: string }) {
         <BodyPreview opened={opened} />
       </Card>
       <Section title={t("moderate.decision")}>
-        <Button title={t("moderate.approve")} busy={busy === "approve"} disabled={!!opened.problems.length || !!busy} onPress={() => confirm("approve")} />
-        <Field label={t("moderate.feedback")} value={feedback} onChangeText={setFeedback} multiline help={t("moderate.feedbackHelp")} />
+        <Button
+          title={t("moderate.approve")}
+          busy={busy === "approve"}
+          disabled={!!opened.problems.length || !!busy}
+          onPress={() => confirm("approve")}
+        />
+        <Field
+          label={t("moderate.feedback")}
+          value={feedback}
+          onChangeText={setFeedback}
+          multiline
+          help={t("moderate.feedbackHelp")}
+        />
         <Row>
-          <Button kind="secondary" title={t("moderate.requestChanges")} busy={busy === "changes"} disabled={!feedback.trim() || !!busy} onPress={() => confirm("changes")} />
-          <Button kind="danger" title={t("moderate.reject")} busy={busy === "reject"} disabled={!feedback.trim() || !!busy} onPress={() => confirm("reject")} />
+          <Button
+            kind="secondary"
+            title={t("moderate.requestChanges")}
+            busy={busy === "changes"}
+            disabled={!feedback.trim() || !!busy}
+            onPress={() => confirm("changes")}
+          />
+          <Button
+            kind="danger"
+            title={t("moderate.reject")}
+            busy={busy === "reject"}
+            disabled={!feedback.trim() || !!busy}
+            onPress={() => confirm("reject")}
+          />
         </Row>
       </Section>
     </Screen>

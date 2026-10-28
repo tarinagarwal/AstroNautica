@@ -1,6 +1,13 @@
 import NativeAzaadNet from "../native/specs/NativeAzaadNet";
 import { base64ToBytes, bytesToBase64, nextId, utf8 } from "../util/bytes";
-import { HttpError, type DownloadRequest, type Http, type HttpRequest, type HttpResponse, type UploadRequest } from "./types";
+import {
+  HttpError,
+  type DownloadRequest,
+  type Http,
+  type HttpRequest,
+  type HttpResponse,
+  type UploadRequest,
+} from "./types";
 import { onNativeEvent } from "./nativeEvents";
 
 interface RawResponse {
@@ -30,7 +37,12 @@ function withAbort<T>(signal: AbortSignal | undefined, id: string, run: () => Pr
 
 const parse = (json: string): HttpResponse => {
   const r = JSON.parse(json) as RawResponse;
-  return { status: r.status, headers: r.headers ?? {}, body: r.bodyBase64 ? base64ToBytes(r.bodyBase64) : new Uint8Array(0), url: r.url };
+  return {
+    status: r.status,
+    headers: r.headers ?? {},
+    body: r.bodyBase64 ? base64ToBytes(r.bodyBase64) : new Uint8Array(0),
+    url: r.url,
+  };
 };
 
 /** HTTP through the app's OkHttp client (direct with DoH, or through Tor). */
@@ -64,8 +76,8 @@ export const nativeHttp: Http = {
       maxBytes: req.maxBytes ?? 4 * 1024 * 1024 * 1024,
       timeoutMs: req.timeoutMs ?? 60_000,
     });
-    return withAbort(req.signal, id, async () => JSON.parse(await NativeAzaadNet.download(id, payload))).finally(
-      () => off?.(),
+    return withAbort(req.signal, id, async () => JSON.parse(await NativeAzaadNet.download(id, payload))).finally(() =>
+      off?.(),
     );
   },
 

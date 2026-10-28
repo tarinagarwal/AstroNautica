@@ -21,7 +21,11 @@ import type { AppData } from "../data/appData";
 export { createAuditEvent, type AuditAction } from "@azaadawaaz/core";
 
 /** The newest copy of this signer's list, from what we hold and what relays have now. */
-export async function currentItems(app: AppData, author: string, name: ModeratorListName): Promise<ModeratorListItem[]> {
+export async function currentItems(
+  app: AppData,
+  author: string,
+  name: ModeratorListName,
+): Promise<ModeratorListItem[]> {
   const remote = await app.pool
     .query(app.relayUrls(), { kinds: [KIND_APP_DATA], authors: [author], "#d": [listD(name)] })
     .catch(() => [] as Event[]);
@@ -71,25 +75,49 @@ async function record(api: Api | null, fn: (api: Api) => Promise<unknown>): Prom
   }
 }
 
-export async function hideComment(app: AppData, api: Api | null, sk: Uint8Array, me: string, commentId: string): Promise<ModResult> {
+export async function hideComment(
+  app: AppData,
+  api: Api | null,
+  sk: Uint8Array,
+  me: string,
+  commentId: string,
+): Promise<ModResult> {
   const change = await changeList(app, sk, me, "hidden", [{ op: "add", value: commentId }]);
   const audit = createAuditEvent({ action: "hide", eventId: commentId }, sk);
   return { ...change, audit, auditError: await record(api, (a) => a.audit(audit)) };
 }
 
-export async function muteKey(app: AppData, api: Api | null, sk: Uint8Array, me: string, pubkey: string): Promise<ModResult> {
+export async function muteKey(
+  app: AppData,
+  api: Api | null,
+  sk: Uint8Array,
+  me: string,
+  pubkey: string,
+): Promise<ModResult> {
   const change = await changeList(app, sk, me, "muted", [{ op: "add", value: pubkey }]);
   const audit = createAuditEvent({ action: "mute", pubkey }, sk);
   return { ...change, audit, auditError: await record(api, (a) => a.audit(audit)) };
 }
 
-export async function unlistStory(app: AppData, api: Api | null, sk: Uint8Array, me: string, storyId: string): Promise<ModResult> {
+export async function unlistStory(
+  app: AppData,
+  api: Api | null,
+  sk: Uint8Array,
+  me: string,
+  storyId: string,
+): Promise<ModResult> {
   const change = await changeList(app, sk, me, "unlisted", [{ op: "add", value: storyId }]);
   const audit = createAuditEvent({ action: "unlist", storyId }, sk);
   return { ...change, audit, auditError: await record(api, (a) => a.unlist(storyId, audit)) };
 }
 
-export function setFeatured(app: AppData, sk: Uint8Array, me: string, storyId: string, on: boolean): Promise<ListChange> {
+export function setFeatured(
+  app: AppData,
+  sk: Uint8Array,
+  me: string,
+  storyId: string,
+  on: boolean,
+): Promise<ListChange> {
   return changeList(app, sk, me, "featured", [{ op: on ? "add" : "remove", value: storyId }]);
 }
 
@@ -106,10 +134,25 @@ export async function syncContributors(
   const rows = await api.contributors();
   const current = new Set((await currentItems(app, me, "contributors")).map(([v]) => v));
   const revokedNow = new Set((await currentItems(app, me, "revoked-contributors")).map(([v]) => v));
-  const added = rows.filter((r) => !r.revokedAt && !current.has(r.pubkey) && !revokedNow.has(r.pubkey)).map((r) => r.pubkey);
+  const added = rows
+    .filter((r) => !r.revokedAt && !current.has(r.pubkey) && !revokedNow.has(r.pubkey))
+    .map((r) => r.pubkey);
   const revoked = rows.filter((r) => r.revokedAt && !revokedNow.has(r.pubkey)).map((r) => r.pubkey);
-  if (added.length) await changeList(app, sk, me, "contributors", added.map((value) => ({ op: "add" as const, value })));
+  if (added.length)
+    await changeList(
+      app,
+      sk,
+      me,
+      "contributors",
+      added.map((value) => ({ op: "add" as const, value })),
+    );
   if (revoked.length)
-    await changeList(app, sk, me, "revoked-contributors", revoked.map((value) => ({ op: "add" as const, value })));
+    await changeList(
+      app,
+      sk,
+      me,
+      "revoked-contributors",
+      revoked.map((value) => ({ op: "add" as const, value })),
+    );
   return { added, revoked };
 }

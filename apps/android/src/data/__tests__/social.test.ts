@@ -1,4 +1,10 @@
-import { DEFAULT_POW_DIFFICULTY, committedPow, createListEvent, verifyEventStrict, type EventTemplate } from "@azaadawaaz/core";
+import {
+  DEFAULT_POW_DIFFICULTY,
+  committedPow,
+  createListEvent,
+  verifyEventStrict,
+  type EventTemplate,
+} from "@azaadawaaz/core";
 import { getEventHash } from "nostr-tools/pure";
 import { createHash } from "node:crypto";
 import { normalizeConfig } from "../../config";
@@ -16,7 +22,9 @@ const jsMiner: NativeMiner & { calls: number } = {
   async mine(_id, prefix, suffix, difficulty, start) {
     this.calls++;
     for (let n = start; ; n++) {
-      const h = createHash("sha256").update(prefix + n + suffix).digest();
+      const h = createHash("sha256")
+        .update(prefix + n + suffix)
+        .digest();
       let bits = 0;
       for (const b of h) {
         if (b === 0) bits += 8;
@@ -32,13 +40,22 @@ const jsMiner: NativeMiner & { calls: number } = {
 };
 
 describe("proof-of-work", () => {
-  const template: EventTemplate = { kind: 1111, created_at: NOW, tags: [["A", "30023:x:y"]], content: 'quote " and \\ and हिन्दी 🙏' };
+  const template: EventTemplate = {
+    kind: 1111,
+    created_at: NOW,
+    tags: [["A", "30023:x:y"]],
+    content: 'quote " and \\ and हिन्दी 🙏',
+  };
 
   it("splits the serialisation exactly where nostr-tools puts the nonce", () => {
     const { prefix, suffix, tags } = powParts(template, contributor.pubkey, 16);
     const ev = { ...template, pubkey: contributor.pubkey, tags: tags("12345") };
     expect(prefix + "12345" + suffix).toBe(serializeForId(ev));
-    expect(createHash("sha256").update(prefix + "12345" + suffix).digest("hex")).toBe(getEventHash(ev));
+    expect(
+      createHash("sha256")
+        .update(prefix + "12345" + suffix)
+        .digest("hex"),
+    ).toBe(getEventHash(ev));
   });
 
   it("mines with the native miner and falls back to JS", async () => {
@@ -59,7 +76,13 @@ describe("comments and reactions", () => {
     const fs = nodeFs();
     const story = publishStory();
     const pool = new MemoryPool([...ownerLists(), story.event]);
-    const app = new AppData(normalizeConfig({ ownerPubkey: owner.pubkey, powDifficulty: 10 }), pool, new GatewayClient(fakeHttp(() => ({ status: 404 }))), new JsonStore(fs, "d"), fs);
+    const app = new AppData(
+      normalizeConfig({ ownerPubkey: owner.pubkey, powDifficulty: 10 }),
+      pool,
+      new GatewayClient(fakeHttp(() => ({ status: 404 }))),
+      new JsonStore(fs, "d"),
+      fs,
+    );
     await app.refresh();
     const ref = app.stories[0]!;
     const social = new StorySocial(app, ref, jsMiner);

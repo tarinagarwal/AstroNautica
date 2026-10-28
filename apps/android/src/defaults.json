@@ -4,12 +4,7 @@
     {
       "kind": 30078,
       "created_at": 1793147824,
-      "tags": [
-        [
-          "d",
-          "azaad:list:moderators"
-        ]
-      ],
+      "tags": [["d", "azaad:list:moderators"]],
       "content": "{\"schema\":\"azaadawaaz/list@1\",\"name\":\"moderators\",\"items\":[{\"pubkey\":\"e7c45de8aad52d988b723656358fc8a3947fbf498abd4dd272486dfbbfba8c5e\",\"x25519\":\"8d849b745704be49ed35d59701f01c562858f3875a7b5bb6156eae11625b8d26\",\"name\":\"Sample Moderator A\",\"from\":1793147764},{\"pubkey\":\"3a754026584b42ec594dbb379ac27c734d5f4d57b46260d6d3ed2bb3d385603e\",\"x25519\":\"2a7d2df23b1d397754b6dee7c7c772993ec3aa391f973bb02e2a0339fabc553a\",\"name\":\"Sample Moderator B\",\"from\":1793147764}]}",
       "pubkey": "11a080a5cbb9fd1262fc2c3566f108aaa8d64084a5084d6838307a963e98d6ba",
       "id": "bab243c02a1880419f9a08d258a2167d8e31058ec75032db54f71438f77e3b21",
@@ -18,12 +13,7 @@
     {
       "kind": 30078,
       "created_at": 1793147824,
-      "tags": [
-        [
-          "d",
-          "azaad:list:service-keys"
-        ]
-      ],
+      "tags": [["d", "azaad:list:service-keys"]],
       "content": "{\"schema\":\"azaadawaaz/list@1\",\"name\":\"service-keys\",\"items\":[{\"role\":\"owner\",\"pubkey\":\"11a080a5cbb9fd1262fc2c3566f108aaa8d64084a5084d6838307a963e98d6ba\",\"x25519\":\"37439da8f8a955ce7ba75ed867630b971fe9dfa5158519c63458874fd62a3472\",\"from\":1793147764},{\"role\":\"publisher\",\"pubkey\":\"541d0e1f360aeb795e39138f8d982f0759adaf801cd3a18dfda688e7156b4a92\",\"x25519\":\"27cfa2cf6ee0120ab29507455710d73c015de493336dc9ed2c966d2eb2856a08\",\"evm\":\"0x70997970C51812dc3A010C7d01b50e0d17dc79C8\",\"from\":1793147764}]}",
       "pubkey": "11a080a5cbb9fd1262fc2c3566f108aaa8d64084a5084d6838307a963e98d6ba",
       "id": "74e266671a553a6348e87ae55dc0c870d1a856d7e790c2fdca664e7dcee921d4",
@@ -32,12 +22,7 @@
     {
       "kind": 30078,
       "created_at": 1793147824,
-      "tags": [
-        [
-          "d",
-          "azaad:list:relays"
-        ]
-      ],
+      "tags": [["d", "azaad:list:relays"]],
       "content": "{\"schema\":\"azaadawaaz/list@1\",\"name\":\"relays\",\"items\":[{\"url\":\"ws://127.0.0.1:7777\",\"operator\":\"own\",\"country\":\"local\"},{\"url\":\"ws://127.0.0.1:7778\",\"operator\":\"own\",\"country\":\"local\"}]}",
       "pubkey": "11a080a5cbb9fd1262fc2c3566f108aaa8d64084a5084d6838307a963e98d6ba",
       "id": "d134bfc97836a949b80e88c77f2d0b1201a1aaa1ca774d3896986bedf0fdf805",
@@ -46,12 +31,7 @@
     {
       "kind": 30078,
       "created_at": 1793147824,
-      "tags": [
-        [
-          "d",
-          "azaad:list:gateways"
-        ]
-      ],
+      "tags": [["d", "azaad:list:gateways"]],
       "content": "{\"schema\":\"azaadawaaz/list@1\",\"name\":\"gateways\",\"items\":[{\"url\":\"http://127.0.0.1:8080\",\"network\":\"ipfs\",\"operator\":\"own\"},{\"url\":\"http://127.0.0.1:8081\",\"network\":\"ipfs\",\"operator\":\"own\"},{\"url\":\"http://127.0.0.1:1984\",\"network\":\"arweave\",\"operator\":\"own\"}]}",
       "pubkey": "11a080a5cbb9fd1262fc2c3566f108aaa8d64084a5084d6838307a963e98d6ba",
       "id": "9f0fcec6a13f207f53d37fda09559547e4ee68c8d743330352743352b7363f1f",
@@ -60,12 +40,7 @@
     {
       "kind": 30078,
       "created_at": 1793147824,
-      "tags": [
-        [
-          "d",
-          "azaad:list:mirrors"
-        ]
-      ],
+      "tags": [["d", "azaad:list:mirrors"]],
       "content": "{\"schema\":\"azaadawaaz/list@1\",\"name\":\"mirrors\",\"items\":[{\"url\":\"http://localhost:5173\"}]}",
       "pubkey": "11a080a5cbb9fd1262fc2c3566f108aaa8d64084a5084d6838307a963e98d6ba",
       "id": "5c57332b7a7bf0b8ca3722e64dd9f077b194f5f907e286adccded959bf1409d5",
@@ -73,10 +48,7 @@
     }
   ],
   "apiUrl": "http://127.0.0.1:8787",
-  "bootstrapRelays": [
-    "ws://127.0.0.1:7777",
-    "ws://127.0.0.1:7778"
-  ],
+  "bootstrapRelays": ["ws://127.0.0.1:7777", "ws://127.0.0.1:7778"],
   "chains": [
     {
       "key": "base-local",

@@ -3,7 +3,14 @@
  * (created when an invite is redeemed), and a moderator's Nostr key plus X25519 key. All live in the vault (Android
  * Keystore, plus the PIN layer when an app lock is set). Contributor and moderator keys require an app lock.
  */
-import { generateKeyPair, keyPairFromSecret, parseSecretKey, encryptionPublicKey, type EncryptionKeyPair, type KeyPair } from "@azaadawaaz/core";
+import {
+  generateKeyPair,
+  keyPairFromSecret,
+  parseSecretKey,
+  encryptionPublicKey,
+  type EncryptionKeyPair,
+  type KeyPair,
+} from "@azaadawaaz/core";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 
 export interface VaultState {

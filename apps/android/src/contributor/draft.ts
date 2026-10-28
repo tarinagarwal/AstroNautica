@@ -175,7 +175,8 @@ export interface DraftMedia {
 export function draftMedia(d: Draft): DraftMedia[] {
   const out = new Map<string, DraftMedia>();
   const add = (m: StrippedMedia | null | undefined, kind: "image" | "video") => {
-    if (m && !out.has(m.sha256)) out.set(m.sha256, { sha256: m.sha256, size: m.size, mime: m.mime, kind, path: m.path });
+    if (m && !out.has(m.sha256))
+      out.set(m.sha256, { sha256: m.sha256, size: m.size, mime: m.mime, kind, path: m.path });
   };
   add(d.cover, "image");
   for (const b of d.blocks) {
@@ -197,11 +198,16 @@ const IMAGE_MIMES = ["image/jpeg", "image/png", "image/webp"];
 const VIDEO_MIMES = ["video/mp4", "video/quicktime"];
 
 /** Everything that must be fixed before the draft can be submitted. Empty means ready. */
-export function validateDraft(d: Draft, contributorNpub: string, limits: MediaLimits = DEFAULT_MEDIA_LIMITS): DraftProblem[] {
+export function validateDraft(
+  d: Draft,
+  contributorNpub: string,
+  limits: MediaLimits = DEFAULT_MEDIA_LIMITS,
+): DraftProblem[] {
   const problems: DraftProblem[] = [];
   if (d.storyId && !isUuidv7(d.storyId)) problems.push({ key: "editor.problem.storyId" });
   if (d.blocks.length === 0) problems.push({ key: "editor.problem.noBlocks" });
-  if (d.blocks.length > limits.maxBlocks) problems.push({ key: "editor.problem.tooManyBlocks", vars: { max: limits.maxBlocks } });
+  if (d.blocks.length > limits.maxBlocks)
+    problems.push({ key: "editor.problem.tooManyBlocks", vars: { max: limits.maxBlocks } });
   const allMedia: StrippedMedia[] = [];
   if (d.cover) allMedia.push(d.cover);
   d.blocks.forEach((b, i) => {
@@ -219,7 +225,8 @@ export function validateDraft(d: Draft, contributorNpub: string, limits: MediaLi
   for (const m of allMedia) {
     if (!m.metadataFree) problems.push({ key: "editor.problem.metadata" });
     const isVideo = VIDEO_MIMES.includes(m.mime);
-    if (!isVideo && !IMAGE_MIMES.includes(m.mime)) problems.push({ key: "editor.problem.mime", vars: { mime: m.mime } });
+    if (!isVideo && !IMAGE_MIMES.includes(m.mime))
+      problems.push({ key: "editor.problem.mime", vars: { mime: m.mime } });
     const max = isVideo ? limits.maxVideoBytes : limits.maxImageBytes;
     if (m.size > max) problems.push({ key: "editor.problem.tooLarge", vars: { mb: Math.round(max / 1024 / 1024) } });
   }

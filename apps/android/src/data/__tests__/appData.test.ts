@@ -2,7 +2,18 @@ import { createListEvent, type Event } from "@azaadawaaz/core";
 import { bundledConfig, normalizeConfig } from "../../config";
 import { JsonStore } from "../../platform/kv";
 import { fakeHttp, nodeFs } from "../../test/nodePlatform";
-import { ARWEAVE, GATEWAY, MemoryPool, NOW, PUBLIC_GATEWAY, gatewayHandler, modA, owner, ownerLists, publishStory } from "../../test/fixtures";
+import {
+  ARWEAVE,
+  GATEWAY,
+  MemoryPool,
+  NOW,
+  PUBLIC_GATEWAY,
+  gatewayHandler,
+  modA,
+  owner,
+  ownerLists,
+  publishStory,
+} from "../../test/fixtures";
 import { AppData } from "../appData";
 import { GatewayClient } from "../gateways";
 
@@ -10,9 +21,16 @@ function setup(opts: { events?: Event[]; handler?: Parameters<typeof fakeHttp>[0
   const fs = nodeFs();
   const story = publishStory();
   const pool = new MemoryPool(opts.events ?? [...ownerLists(), story.event, story.receipt]);
-  const http = fakeHttp(opts.handler ?? gatewayHandler(story.files, { arweave: new Map([[story.arweaveTx, story.bytes]]) }), fs);
+  const http = fakeHttp(
+    opts.handler ?? gatewayHandler(story.files, { arweave: new Map([[story.arweaveTx, story.bytes]]) }),
+    fs,
+  );
   const gateways = new GatewayClient(http);
-  const config = normalizeConfig({ ownerPubkey: owner.pubkey, listEvents: opts.bundled ?? [], bootstrapRelays: ["wss://boot.example"] });
+  const config = normalizeConfig({
+    ownerPubkey: owner.pubkey,
+    listEvents: opts.bundled ?? [],
+    bootstrapRelays: ["wss://boot.example"],
+  });
   const app = new AppData(config, pool, gateways, new JsonStore(fs, "data"), fs);
   return { fs, story, pool, http, gateways, app, config };
 }
@@ -62,7 +80,10 @@ describe("AppData", () => {
     const story = publishStory();
     const { app } = setup({
       events: [...ownerLists(), story.event, story.receipt],
-      handler: gatewayHandler(story.files, { down: new Set([GATEWAY, PUBLIC_GATEWAY]), arweave: new Map([[story.arweaveTx, story.bytes]]) }),
+      handler: gatewayHandler(story.files, {
+        down: new Set([GATEWAY, PUBLIC_GATEWAY]),
+        arweave: new Map([[story.arweaveTx, story.bytes]]),
+      }),
     });
     await app.refresh();
     const m = await app.loadManifest(app.stories[0]!);
@@ -79,7 +100,13 @@ describe("AppData", () => {
     s.app.unwatch();
     // A new start with relays and gateways unreachable still shows the story and its verified manifest.
     s.pool.reachable = false;
-    const again = new AppData(s.config, s.pool, new GatewayClient(fakeHttp(() => ({ status: 503 }))), new JsonStore(s.fs, "data"), s.fs);
+    const again = new AppData(
+      s.config,
+      s.pool,
+      new GatewayClient(fakeHttp(() => ({ status: 503 }))),
+      new JsonStore(s.fs, "data"),
+      s.fs,
+    );
     await again.init();
     expect(again.listsStatus).toBe("ready");
     expect(again.stories).toHaveLength(1);
@@ -106,7 +133,12 @@ describe("AppData", () => {
   });
 
   it("reports no lists when nothing chains to the pinned owner key", async () => {
-    const stranger = createListEvent("relays", [{ url: "wss://evil.example", operator: "own" }], modA.secretKey, NOW - 10);
+    const stranger = createListEvent(
+      "relays",
+      [{ url: "wss://evil.example", operator: "own" }],
+      modA.secretKey,
+      NOW - 10,
+    );
     const s = setup({ events: [stranger] });
     await s.app.refresh();
     expect(s.app.listsStatus).toBe("none");

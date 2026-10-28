@@ -24,7 +24,10 @@ describe("save for offline", () => {
       manifestBytes: story.bytes,
       storageEvents: [story.receipt],
       includeVideo: true,
-      fetchFile: (sha, info) => (info.kind === "video" ? media.video({ sha256: sha, cid: info.cid! }) : media.original({ sha256: sha, cid: info.cid })),
+      fetchFile: (sha, info) =>
+        info.kind === "video"
+          ? media.video({ sha256: sha, cid: info.cid! })
+          : media.original({ sha256: sha, cid: info.cid }),
     });
     expect(entry.files).toHaveLength(3);
     expect(gateways.flaggedSources()).toContain(GATEWAY);

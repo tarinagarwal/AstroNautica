@@ -4,7 +4,12 @@
  */
 export const AUTO_LOCK_MS = 60_000;
 
-export function mustLockOnResume(backgroundedAt: number | null, now: number, lockEnabled: boolean, timeoutMs = AUTO_LOCK_MS): boolean {
+export function mustLockOnResume(
+  backgroundedAt: number | null,
+  now: number,
+  lockEnabled: boolean,
+  timeoutMs = AUTO_LOCK_MS,
+): boolean {
   return lockEnabled && backgroundedAt !== null && now - backgroundedAt >= timeoutMs;
 }
 

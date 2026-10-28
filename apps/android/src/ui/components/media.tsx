@@ -64,18 +64,41 @@ export function VerifiedImage({
         ) : null}
       </View>
     );
-  return <Image source={{ uri: `file://${path}` }} style={{ width: "100%", aspectRatio: ratio, borderRadius: 6 }} resizeMode="cover" accessibilityIgnoresInvertColors />;
+  return (
+    <Image
+      source={{ uri: `file://${path}` }}
+      style={{ width: "100%", aspectRatio: ratio, borderRadius: 6 }}
+      resizeMode="cover"
+      accessibilityIgnoresInvertColors
+    />
+  );
 }
 
 export function LocalImage({ path, aspect = 4 / 3 }: { path: string; aspect?: number }) {
-  return <Image source={{ uri: `file://${path}` }} style={{ width: "100%", aspectRatio: aspect, borderRadius: 6 }} resizeMode="cover" />;
+  return (
+    <Image
+      source={{ uri: `file://${path}` }}
+      style={{ width: "100%", aspectRatio: aspect, borderRadius: 6 }}
+      resizeMode="cover"
+    />
+  );
 }
 
 /**
  * Video: HLS through the in-app verified media provider (every block checked against its CID, gateways tried in
  * turn, all through Tor/DoH); if that fails, the MP4 fallback is downloaded and played only once its SHA-256 matches.
  */
-export function VideoPlayer({ hls, mp4, poster, offlinePath }: { hls: string; mp4: FileRef; poster?: FileRef; offlinePath?: string }) {
+export function VideoPlayer({
+  hls,
+  mp4,
+  poster,
+  offlinePath,
+}: {
+  hls: string;
+  mp4: FileRef;
+  poster?: FileRef;
+  offlinePath?: string;
+}) {
   const { media, gateways, net } = useServices();
   const { t } = useI18n();
   const [mode, setMode] = useState<"idle" | "hls" | "mp4-loading" | "mp4" | "error">(offlinePath ? "mp4" : "idle");
@@ -102,15 +125,34 @@ export function VideoPlayer({ hls, mp4, poster, offlinePath }: { hls: string; mp
   if (mode === "idle")
     return (
       <Pressable accessibilityRole="button" accessibilityLabel={t("video.play")} onPress={start}>
-        <View style={{ aspectRatio: 16 / 9, backgroundColor: "#000", borderRadius: 6, overflow: "hidden", justifyContent: "center", alignItems: "center" }}>
-          {posterPath ? <Image source={{ uri: `file://${posterPath}` }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
+        <View
+          style={{
+            aspectRatio: 16 / 9,
+            backgroundColor: "#000",
+            borderRadius: 6,
+            overflow: "hidden",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          {posterPath ? (
+            <Image source={{ uri: `file://${posterPath}` }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          ) : null}
           <Text style={{ color: "#fff", fontSize: 48 }}>▶</Text>
         </View>
       </Pressable>
     );
   if (mode === "mp4-loading")
     return (
-      <View style={{ aspectRatio: 16 / 9, backgroundColor: "#111", borderRadius: 6, justifyContent: "center", padding: space.l }}>
+      <View
+        style={{
+          aspectRatio: 16 / 9,
+          backgroundColor: "#111",
+          borderRadius: 6,
+          justifyContent: "center",
+          padding: space.l,
+        }}
+      >
         <Txt style={{ color: "#fff" }}>{t("video.downloading", { percent: Math.round(progress * 100) })}</Txt>
       </View>
     );
@@ -162,7 +204,12 @@ function InlineText({ nodes, lang, onLink }: { nodes: Inline[]; lang: "en" | "hi
             );
           case "link":
             return (
-              <Text key={i} accessibilityRole="link" style={{ color: colors.link, textDecorationLine: "underline" }} onPress={() => onLink(n.href)}>
+              <Text
+                key={i}
+                accessibilityRole="link"
+                style={{ color: colors.link, textDecorationLine: "underline" }}
+                onPress={() => onLink(n.href)}
+              >
                 <InlineText nodes={n.children} lang={lang} onLink={onLink} />
               </Text>
             );
@@ -181,7 +228,20 @@ function MdBlocks({ blocks, lang, onLink }: { blocks: MdBlock[]; lang: "en" | "h
           case "heading": {
             const size = [0, 26, 22, 19, 18, 17, 17][b.level] ?? 17;
             return (
-              <Text key={i} accessibilityRole="header" style={[base, { fontSize: size, lineHeight: size * 1.35, fontWeight: "700", marginTop: space.m, marginBottom: space.s }]}>
+              <Text
+                key={i}
+                accessibilityRole="header"
+                style={[
+                  base,
+                  {
+                    fontSize: size,
+                    lineHeight: size * 1.35,
+                    fontWeight: "700",
+                    marginTop: space.m,
+                    marginBottom: space.s,
+                  },
+                ]}
+              >
                 <InlineText nodes={b.children} lang={lang} onLink={onLink} />
               </Text>
             );
@@ -194,7 +254,15 @@ function MdBlocks({ blocks, lang, onLink }: { blocks: MdBlock[]; lang: "en" | "h
             );
           case "quote":
             return (
-              <View key={i} style={{ borderLeftWidth: 3, borderLeftColor: colors.border, paddingLeft: space.m, marginBottom: space.m }}>
+              <View
+                key={i}
+                style={{
+                  borderLeftWidth: 3,
+                  borderLeftColor: colors.border,
+                  paddingLeft: space.m,
+                  marginBottom: space.m,
+                }}
+              >
                 <MdBlocks blocks={b.children} lang={lang} onLink={onLink} />
               </View>
             );
@@ -213,7 +281,16 @@ function MdBlocks({ blocks, lang, onLink }: { blocks: MdBlock[]; lang: "en" | "h
             );
           case "code":
             return (
-              <Text key={i} selectable style={{ fontFamily: "monospace", backgroundColor: colors.code, padding: space.s, marginBottom: space.m }}>
+              <Text
+                key={i}
+                selectable
+                style={{
+                  fontFamily: "monospace",
+                  backgroundColor: colors.code,
+                  padding: space.s,
+                  marginBottom: space.m,
+                }}
+              >
                 {b.text}
               </Text>
             );

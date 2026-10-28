@@ -40,7 +40,13 @@ export function ownerLists(at = NOW - 1000, extra: { publisherEvm?: string } = {
       "service-keys",
       [
         { role: "owner", pubkey: owner.pubkey, x25519: OWNER_X, from: at - 10_000 },
-        { role: "publisher", pubkey: publisher.pubkey, x25519: "44".repeat(32), evm: extra.publisherEvm ?? PUBLISHER_EVM, from: at - 10_000 },
+        {
+          role: "publisher",
+          pubkey: publisher.pubkey,
+          x25519: "44".repeat(32),
+          evm: extra.publisherEvm ?? PUBLISHER_EVM,
+          from: at - 10_000,
+        },
       ],
       owner.secretKey,
       at,
@@ -71,9 +77,12 @@ export interface PublishedStory {
   arweaveTx: string;
 }
 
-const rand = (n: number, seed: number) => Uint8Array.from({ length: n }, (_, i) => (i * 131 + seed * 17 + (i >> 3)) & 255);
+const rand = (n: number, seed: number) =>
+  Uint8Array.from({ length: n }, (_, i) => (i * 131 + seed * 17 + (i >> 3)) & 255);
 
-export function publishStory(opts: { title?: string; storyId?: string; approver?: typeof modA; publishedAt?: number } = {}): PublishedStory {
+export function publishStory(
+  opts: { title?: string; storyId?: string; approver?: typeof modA; publishedAt?: number } = {},
+): PublishedStory {
   const image = rand(3000, 1);
   const mp4 = rand(5000, 2);
   const poster = rand(1200, 3);
@@ -94,7 +103,18 @@ export function publishStory(opts: { title?: string; storyId?: string; approver?
     contributor: { pubkey: contributor.npub, displayName: "Pen name" },
     blocks: [
       { type: "text", markdown: { en: "## Morning\nWater rose.", hi: "## सुबह\nपानी बढ़ा।" } },
-      { type: "image", items: [{ sha256: sha256Hex(image), cid: imageCid, width: 1600, height: 900, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj" }] },
+      {
+        type: "image",
+        items: [
+          {
+            sha256: sha256Hex(image),
+            cid: imageCid,
+            width: 1600,
+            height: 900,
+            blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj",
+          },
+        ],
+      },
       {
         type: "video",
         source: { sha256: "d".repeat(64) },
@@ -175,7 +195,9 @@ export class MemoryPool implements PoolLike {
 
   async query(_relays: string[], filter: Filter): Promise<Event[]> {
     if (!this.reachable) return [];
-    const out = [...this.events.values()].filter((e) => MemoryPool.matches(e, filter)).sort((a, b) => b.created_at - a.created_at);
+    const out = [...this.events.values()]
+      .filter((e) => MemoryPool.matches(e, filter))
+      .sort((a, b) => b.created_at - a.created_at);
     return filter.limit ? out.slice(0, filter.limit) : out;
   }
 

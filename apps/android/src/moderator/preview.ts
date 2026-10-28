@@ -13,7 +13,12 @@ import { concatBytes } from "../util/bytes";
 
 export interface ChunkFileDecryptor {
   /** Decrypt chunk files (in order) into dest; resolves with the plaintext hash and size. */
-  decryptChunks(header: Uint8Array, key: Uint8Array, chunkPaths: string[], dest: string): Promise<{ sha256: string; size: number }>;
+  decryptChunks(
+    header: Uint8Array,
+    key: Uint8Array,
+    chunkPaths: string[],
+    dest: string,
+  ): Promise<{ sha256: string; size: number }>;
 }
 
 export class PreviewIntegrityError extends Error {

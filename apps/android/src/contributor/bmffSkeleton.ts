@@ -283,7 +283,8 @@ export function droppedSampleRanges(sk: Skeleton): Range[] {
           p += 4;
         }
         if (flags & 0x4) p += 4;
-        const per = (flags & 0x100 ? 4 : 0) + (flags & 0x200 ? 4 : 0) + (flags & 0x400 ? 4 : 0) + (flags & 0x800 ? 4 : 0);
+        const per =
+          (flags & 0x100 ? 4 : 0) + (flags & 0x200 ? 4 : 0) + (flags & 0x400 ? 4 : 0) + (flags & 0x800 ? 4 : 0);
         const sizeAt = flags & 0x100 ? 4 : 0;
         let total = 0;
         for (let i = 0; i < count; i++) total += flags & 0x200 ? u32(b, p + i * per + sizeAt) : defaultSize;

@@ -22,9 +22,20 @@ const sealedJson = await core.encryptJson({ hello: "world", n: 1 }, contentKey);
 
 const vectors = {
   x25519: { privateKey: kp.privateKey, publicKey: kp.publicKey },
-  sealedBox: { recipientPublic: kp.publicKey, recipientPrivate: kp.privateKey, message: hex(contentKey), sealed: hex(sodium.crypto_box_seal(contentKey, sodium.from_hex(kp.publicKey))) },
+  sealedBox: {
+    recipientPublic: kp.publicKey,
+    recipientPrivate: kp.privateKey,
+    message: hex(contentKey),
+    sealed: hex(sodium.crypto_box_seal(contentKey, sodium.from_hex(kp.publicKey))),
+  },
   wrapKey: { wrapped: await core.wrapKey(contentKey, kp.publicKey), contentKey: hex(contentKey) },
-  secretstream: { key: hex(contentKey), header: hex(blob.header), chunks: blob.chunks.map(hex), chunkSize: 1000, plaintext: hex(plain) },
+  secretstream: {
+    key: hex(contentKey),
+    header: hex(blob.header),
+    chunks: blob.chunks.map(hex),
+    chunkSize: 1000,
+    plaintext: hex(plain),
+  },
   emptyStream: { key: hex(contentKey), header: hex(empty.header), chunks: empty.chunks.map(hex) },
   encryptJson: { key: hex(contentKey), sealed: sealedJson, json: '{"hello":"world","n":1}' },
   message: hex(message),

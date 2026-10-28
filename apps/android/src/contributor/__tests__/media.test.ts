@@ -33,7 +33,13 @@ describe("on-device media preparation", () => {
   it("re-encodes JPEGs through the platform encoder and confirms nothing is left", async () => {
     const fs = nodeFs();
     const log: string[] = [];
-    const m = await prepareImage(fs, tools(fs, log), `file://${FIX}/gps.jpg`, joinPath(fs.paths.files, "d"), DEFAULT_MEDIA_LIMITS);
+    const m = await prepareImage(
+      fs,
+      tools(fs, log),
+      `file://${FIX}/gps.jpg`,
+      joinPath(fs.paths.files, "d"),
+      DEFAULT_MEDIA_LIMITS,
+    );
     expect(log).toHaveLength(1);
     expect(m.converted).toBe(true);
     expect(m.metadataFree).toBe(true);
@@ -47,7 +53,13 @@ describe("on-device media preparation", () => {
   it("strips PNG and WebP losslessly, dropping the ICC profile too", async () => {
     const fs = nodeFs();
     for (const f of ["gps.png", "gps.webp"]) {
-      const m = await prepareImage(fs, tools(fs, []), `file://${FIX}/${f}`, joinPath(fs.paths.files, "d"), DEFAULT_MEDIA_LIMITS);
+      const m = await prepareImage(
+        fs,
+        tools(fs, []),
+        `file://${FIX}/${f}`,
+        joinPath(fs.paths.files, "d"),
+        DEFAULT_MEDIA_LIMITS,
+      );
       expect(m.converted).toBe(false);
       expect(findMetadata(await fs.readBytes(m.path), m.mime)).toEqual([]);
       expect(m.removed).toContain("gps");
@@ -56,18 +68,32 @@ describe("on-device media preparation", () => {
 
   it("refuses formats it cannot convert", async () => {
     const fs = nodeFs();
-    await expect(prepareImage(fs, tools(fs, []), `file://${FIX}/sample.avif`, joinPath(fs.paths.files, "d"), DEFAULT_MEDIA_LIMITS)).rejects.toThrow();
+    await expect(
+      prepareImage(fs, tools(fs, []), `file://${FIX}/sample.avif`, joinPath(fs.paths.files, "d"), DEFAULT_MEDIA_LIMITS),
+    ).rejects.toThrow();
   });
 
   it("strips videos in place without re-encoding and re-checks the output", async () => {
     const fs = nodeFs();
-    const m = await prepareVideo(fs, tools(fs, []), `file://${FIX}/phone.mov`, joinPath(fs.paths.files, "d"), DEFAULT_MEDIA_LIMITS);
+    const m = await prepareVideo(
+      fs,
+      tools(fs, []),
+      `file://${FIX}/phone.mov`,
+      joinPath(fs.paths.files, "d"),
+      DEFAULT_MEDIA_LIMITS,
+    );
     expect(m.mime).toBe("video/quicktime");
     expect(m.metadataFree).toBe(true);
     expect(m.removed).toEqual(expect.arrayContaining(["mp4:location", "mp4:data-track"]));
     const out = await fs.readBytes(m.path);
     expect(findMetadata(out, "video/quicktime")).toEqual([]);
-    expect(Buffer.from(out).equals(Buffer.from(stripMetadata(new Uint8Array(readFileSync(`${FIX}/phone.mov`)), "video/quicktime")))).toBe(true);
-    await expect(prepareVideo(fs, tools(fs, []), `file://${FIX}/gps.jpg`, joinPath(fs.paths.files, "d"), DEFAULT_MEDIA_LIMITS)).rejects.toBeInstanceOf(MediaError);
+    expect(
+      Buffer.from(out).equals(
+        Buffer.from(stripMetadata(new Uint8Array(readFileSync(`${FIX}/phone.mov`)), "video/quicktime")),
+      ),
+    ).toBe(true);
+    await expect(
+      prepareVideo(fs, tools(fs, []), `file://${FIX}/gps.jpg`, joinPath(fs.paths.files, "d"), DEFAULT_MEDIA_LIMITS),
+    ).rejects.toBeInstanceOf(MediaError);
   });
 });

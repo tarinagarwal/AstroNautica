@@ -50,6 +50,7 @@
     "@react-native/metro-config": "0.88.1",
     "@react-native/typescript-config": "0.88.1",
     "@types/jest": "^29.5.13",
+    "@types/libsodium-wrappers": "^0.7.14",
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^22.20.5",
     "@types/react": "^19.2.0",

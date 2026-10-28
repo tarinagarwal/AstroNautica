@@ -1,0 +1,16 @@
+build/
+android/.gradle/
+android/build/
+android/app/build/
+android/app/.cxx/
+android/jvm-tests/.gradle/
+android/jvm-tests/build/
+android/jvm-tests/.kotlin/
+android/compile-check/.gradle/
+android/compile-check/build/
+android/compile-check/.kotlin/
+android/local.properties
+android/.kotlin/
+*.jks
+*.keystore
+!android/app/debug.keystore

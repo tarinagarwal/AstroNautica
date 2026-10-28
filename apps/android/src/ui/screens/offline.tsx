@@ -1,7 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { Alert, PermissionsAndroid, Platform } from "react-native";
 import NativeAzaadP2P from "../../native/specs/NativeAzaadP2P";
-import { BUNDLE_EXT, BUNDLE_MIME, BundleError, exportBundle, importBundle, type VerifiedBundle } from "../../offline/bundle";
+import {
+  BUNDLE_EXT,
+  BUNDLE_MIME,
+  BundleError,
+  exportBundle,
+  importBundle,
+  type VerifiedBundle,
+} from "../../offline/bundle";
 import type { SavedEntry } from "../../offline/store";
 import { nativeDocuments } from "../../platform/nativeFiles";
 import { onNativeEvent } from "../../platform/nativeEvents";
@@ -21,17 +28,26 @@ export function SavedScreen() {
   useEffect(load, [offline]);
   return (
     <Screen title={t("nav.saved")}>
-      <Txt muted style={{ marginBottom: space.m }}>{t("offline.help")}</Txt>
+      <Txt muted style={{ marginBottom: space.m }}>
+        {t("offline.help")}
+      </Txt>
       {items === null ? <Loading /> : null}
       {items?.length === 0 ? <Txt muted>{t("offline.none")}</Txt> : null}
       {items?.map((e) => (
         <Card key={e.storyId} onPress={() => nav.push({ name: "story", storyId: e.storyId, offline: true })}>
           <Txt bold>{e.title}</Txt>
           <Row>
-            <Txt muted size={13}>{date(e.savedAt)} · {num(Math.round(e.bytes / 1024 / 1024))} MB</Txt>
+            <Txt muted size={13}>
+              {date(e.savedAt)} · {num(Math.round(e.bytes / 1024 / 1024))} MB
+            </Txt>
             {e.source === "bundle" ? <Badge tone="neutral" label={t("offline.fromPhone")} /> : null}
           </Row>
-          <Button small kind="link" title={t("offline.remove")} onPress={() => void offline.remove(e.storyId).then(load)} />
+          <Button
+            small
+            kind="link"
+            title={t("offline.remove")}
+            onPress={() => void offline.remove(e.storyId).then(load)}
+          />
         </Card>
       ))}
     </Screen>
@@ -151,25 +167,47 @@ export function ShareScreen({ storyId }: { storyId: string }) {
   return (
     <Screen title={t("share.title")}>
       <Txt style={{ marginBottom: space.m }}>{t("share.help")}</Txt>
-      <Toggle label={t("share.includeVideo")} value={includeVideo} onChange={setIncludeVideo} help={t("share.includeVideoHelp")} />
-      {!zip ? <Button title={t("share.build")} busy={busy} onPress={() => void build()} /> : <Notice tone="ok">{t("share.ready")}</Notice>}
+      <Toggle
+        label={t("share.includeVideo")}
+        value={includeVideo}
+        onChange={setIncludeVideo}
+        help={t("share.includeVideoHelp")}
+      />
+      {!zip ? (
+        <Button title={t("share.build")} busy={busy} onPress={() => void build()} />
+      ) : (
+        <Notice tone="ok">{t("share.ready")}</Notice>
+      )}
       {error ? <Notice tone="bad">{error}</Notice> : null}
       {zip ? (
         <Section>
-          <Button title={t("share.shareSheet")} onPress={() => void nativeDocuments.share(zip, BUNDLE_MIME, t("share.title"))} />
-          <Button kind="secondary" title={t("share.saveFile")} onPress={() => void nativeDocuments.saveAs(zip, `${storyId}${BUNDLE_EXT}`, BUNDLE_MIME)} />
+          <Button
+            title={t("share.shareSheet")}
+            onPress={() => void nativeDocuments.share(zip, BUNDLE_MIME, t("share.title"))}
+          />
+          <Button
+            kind="secondary"
+            title={t("share.saveFile")}
+            onPress={() => void nativeDocuments.saveAs(zip, `${storyId}${BUNDLE_EXT}`, BUNDLE_MIME)}
+          />
           <Button kind="secondary" title={t("p2p.send")} onPress={() => void startDirect()} />
         </Section>
       ) : null}
       {direct ? (
         <Section title={t("p2p.title")}>
-          <Txt muted size={14}>{t("p2p.sendHelp")}</Txt>
+          <Txt muted size={14}>
+            {t("p2p.sendHelp")}
+          </Txt>
           {transfer.status ? <Txt>{transfer.status === "sent" ? t("p2p.sent") : transfer.status}</Txt> : null}
-          {transfer.progress !== null ? <Txt>{t("p2p.progress", { percent: Math.round(transfer.progress * 100) })}</Txt> : null}
+          {transfer.progress !== null ? (
+            <Txt>{t("p2p.progress", { percent: Math.round(transfer.progress * 100) })}</Txt>
+          ) : null}
           {transfer.peers.map((p) => (
             <Card key={p.address} onPress={() => void NativeAzaadP2P.connect(p.address)}>
               <Txt bold>{p.name || p.address}</Txt>
-              <Txt muted size={12}>{p.address}</Txt>
+              <Txt muted size={12}>
+                {p.address}
+              </Txt>
             </Card>
           ))}
         </Section>
@@ -242,9 +280,13 @@ export function ReceiveScreen({ zipPath }: { zipPath?: string }) {
       <Button kind="secondary" title={t("p2p.receive")} onPress={() => void listen()} />
       {listening ? (
         <Section title={t("p2p.title")}>
-          <Txt muted size={14}>{t("p2p.receiveHelp")}</Txt>
+          <Txt muted size={14}>
+            {t("p2p.receiveHelp")}
+          </Txt>
           {transfer.status ? <Txt>{transfer.status}</Txt> : null}
-          {transfer.progress !== null ? <Txt>{t("p2p.progress", { percent: Math.round(transfer.progress * 100) })}</Txt> : null}
+          {transfer.progress !== null ? (
+            <Txt>{t("p2p.progress", { percent: Math.round(transfer.progress * 100) })}</Txt>
+          ) : null}
           {transfer.peers.map((p) => (
             <Card key={p.address}>
               <Txt>{p.name || p.address}</Txt>
@@ -257,9 +299,15 @@ export function ReceiveScreen({ zipPath }: { zipPath?: string }) {
       {result ? (
         <Card>
           <Badge tone="ok" label={t("receive.verified")} />
-          <Txt bold size={18} style={{ marginTop: space.s }}>{result.ref.title}</Txt>
+          <Txt bold size={18} style={{ marginTop: space.s }}>
+            {result.ref.title}
+          </Txt>
           {result.unlisted ? <Notice>{t("story.unlistedNotice")}</Notice> : null}
-          {result.missing.length ? <Txt muted size={13}>{t("receive.missing", { count: result.missing.length })}</Txt> : null}
+          {result.missing.length ? (
+            <Txt muted size={13}>
+              {t("receive.missing", { count: result.missing.length })}
+            </Txt>
+          ) : null}
           <Button title={t("receive.keep")} onPress={() => void keep()} />
         </Card>
       ) : null}

@@ -75,7 +75,12 @@ export interface ExportInput {
 }
 
 /** Build a bundle zip at `out`. Returns the index (what was included). */
-export async function exportBundle(fs: FileSystem, input: ExportInput, workDir: string, out: string): Promise<BundleIndex> {
+export async function exportBundle(
+  fs: FileSystem,
+  input: ExportInput,
+  workDir: string,
+  out: string,
+): Promise<BundleIndex> {
   await fs.remove(workDir).catch(() => undefined);
   await fs.mkdirs(joinPath(workDir, "media"));
   const files: BundleIndex["files"] = [];
@@ -170,7 +175,8 @@ export async function importBundle(
   }
   const allowed = /^(azaad-bundle\.json|events\.json|manifest\.json|media\/[0-9a-f]{64})$/;
   const strange = entries.filter((e) => !allowed.test(e.name) && !e.name.endsWith("/") && e.name !== "media");
-  if (strange.length) throw new BundleError("bundle.error.unexpected", `unexpected files: ${strange.map((e) => e.name).join(", ")}`);
+  if (strange.length)
+    throw new BundleError("bundle.error.unexpected", `unexpected files: ${strange.map((e) => e.name).join(", ")}`);
 
   const index = await readJsonFile<BundleIndex>(fs, joinPath(destDir, "azaad-bundle.json"));
   if (index?.schema !== BUNDLE_SCHEMA) throw new BundleError("bundle.error.schema", "not an AzaadAwaaz bundle");
@@ -194,7 +200,8 @@ export async function importBundle(
     throw new BundleError("bundle.error.mismatch", "the bundle index does not match the story event");
 
   const check = verifyManifest(manifestBytes, ref, lists);
-  if (!check.ok || !check.manifest) throw new BundleError("bundle.error.manifest", check.errors.join("; ") || "manifest check failed");
+  if (!check.ok || !check.manifest)
+    throw new BundleError("bundle.error.manifest", check.errors.join("; ") || "manifest check failed");
 
   // Files: each must be referenced by the manifest and hash to its name.
   const expected = manifestFiles(check.manifest);
@@ -205,7 +212,8 @@ export async function importBundle(
     if (!isSha256Hex(name) || !expected.has(name))
       throw new BundleError("bundle.error.unexpected", `file ${name} is not part of this story`);
     const path = joinPath(mediaDir, name);
-    if ((await fs.sha256(path)) !== name) throw new BundleError("bundle.error.hash", `file ${name.slice(0, 12)}… is altered`);
+    if ((await fs.sha256(path)) !== name)
+      throw new BundleError("bundle.error.hash", `file ${name.slice(0, 12)}… is altered`);
     media.set(name, path);
   }
   const missing = [...expected.keys()].filter((k) => !media.has(k));

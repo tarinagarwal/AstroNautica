@@ -4,7 +4,15 @@ import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import { normalizeConfig } from "../../config";
 import { JsonStore } from "../../platform/kv";
 import { fakeHttp, nodeFs } from "../../test/nodePlatform";
-import { GATEWAY, MemoryPool, PUBLISHER_EVM, gatewayHandler, owner, ownerLists, publishStory } from "../../test/fixtures";
+import {
+  GATEWAY,
+  MemoryPool,
+  PUBLISHER_EVM,
+  gatewayHandler,
+  owner,
+  ownerLists,
+  publishStory,
+} from "../../test/fixtures";
 import { AppData } from "../appData";
 import { PUBLISHED_TOPIC, RECEIPT_SELECTOR, decodePublishedData, decodeReceipt, encodeReceiptCall } from "../eth";
 import { GatewayClient } from "../gateways";
@@ -26,7 +34,13 @@ function chainHandler(receipts: Map<string, { sha: string; timestamp: number; ci
         if (body.params[0].topics[3] !== "0x" + word(r.by.slice(2))) continue;
         if (!key.startsWith(body.params[0].topics[1].slice(2, 34))) continue;
         const cidHex = Buffer.from(r.cid).toString("hex");
-        const data = "0x" + r.sha + word("60") + word(r.timestamp.toString(16)) + word(r.cid.length.toString(16)) + cidHex.padEnd(Math.ceil(cidHex.length / 64) * 64, "0");
+        const data =
+          "0x" +
+          r.sha +
+          word("60") +
+          word(r.timestamp.toString(16)) +
+          word(r.cid.length.toString(16)) +
+          cidHex.padEnd(Math.ceil(cidHex.length / 64) * 64, "0");
         return [{ data, topics: body.params[0].topics, transactionHash: "0x" + "ee".repeat(32), blockNumber: "0x10" }];
       }
       return [];
@@ -42,7 +56,12 @@ function setup(receiptBy: string, receiptSha?: string) {
   const receipts = new Map([
     [
       encodeReceiptCall(story.manifest.id, 1, receiptBy).slice(10),
-      { sha: receiptSha ?? story.sha, timestamp: Math.floor(Date.parse(story.manifest.publishedAt) / 1000) + 5, cid: story.cid, by: receiptBy },
+      {
+        sha: receiptSha ?? story.sha,
+        timestamp: Math.floor(Date.parse(story.manifest.publishedAt) / 1000) + 5,
+        cid: story.cid,
+        by: receiptBy,
+      },
     ],
   ]);
   const rpc = chainHandler(receipts);
@@ -64,13 +83,19 @@ function setup(receiptBy: string, receiptSha?: string) {
 
 describe("Verify", () => {
   it("uses the new registry ABI", () => {
-    expect(RECEIPT_SELECTOR).toBe("0x" + bytesToHex(keccak_256(utf8ToBytes("receipt(bytes16,uint32,address)"))).slice(0, 8));
-    expect(PUBLISHED_TOPIC).toBe("0x" + bytesToHex(keccak_256(utf8ToBytes("Published(bytes16,uint32,address,bytes32,string,uint64)"))));
+    expect(RECEIPT_SELECTOR).toBe(
+      "0x" + bytesToHex(keccak_256(utf8ToBytes("receipt(bytes16,uint32,address)"))).slice(0, 8),
+    );
+    expect(PUBLISHED_TOPIC).toBe(
+      "0x" + bytesToHex(keccak_256(utf8ToBytes("Published(bytes16,uint32,address,bytes32,string,uint64)"))),
+    );
     const call = encodeReceiptCall("01928f3e-7c1a-7b2c-8d3e-4f5a6b7c8d9e", 3, PUBLISHER_EVM);
     expect(call.slice(10, 42)).toBe(storyIdToBytes16("01928f3e-7c1a-7b2c-8d3e-4f5a6b7c8d9e").slice(2));
     expect(call.length).toBe(10 + 64 * 3);
     expect(decodeReceipt("0x" + "0".repeat(128))).toBeUndefined();
-    const d = decodePublishedData("0x" + "aa".repeat(32) + word("60") + word("2a") + word("3") + Buffer.from("abc").toString("hex").padEnd(64, "0"));
+    const d = decodePublishedData(
+      "0x" + "aa".repeat(32) + word("60") + word("2a") + word("3") + Buffer.from("abc").toString("hex").padEnd(64, "0"),
+    );
     expect(d).toEqual({ sha: "aa".repeat(32), cid: "abc", timestamp: 42 });
   });
 
@@ -85,7 +110,12 @@ describe("Verify", () => {
     expect(result.ipfs.state).toBe("ok");
     expect(result.arweave).toMatchObject({ state: "ok", tx: story.arweaveTx });
     expect(result.chains.state).toBe("ok");
-    expect(result.chains.receipts[0]).toMatchObject({ ok: true, by: PUBLISHER_EVM, txHash: "0x" + "ee".repeat(32), manifestCid: story.cid });
+    expect(result.chains.receipts[0]).toMatchObject({
+      ok: true,
+      by: PUBLISHER_EVM,
+      txHash: "0x" + "ee".repeat(32),
+      manifestCid: story.cid,
+    });
     expect(result.allOk).toBe(true);
     app.unwatch();
   });
@@ -110,7 +140,13 @@ describe("Verify", () => {
     const story = publishStory();
     const fs = nodeFs();
     const http = fakeHttp(gatewayHandler(story.files, { tamper: new Set([GATEWAY]) }), fs);
-    const app = new AppData(normalizeConfig({ ownerPubkey: owner.pubkey }), new MemoryPool([...ownerLists(), story.event]), new GatewayClient(http), new JsonStore(fs, "d"), fs);
+    const app = new AppData(
+      normalizeConfig({ ownerPubkey: owner.pubkey }),
+      new MemoryPool([...ownerLists(), story.event]),
+      new GatewayClient(http),
+      new JsonStore(fs, "d"),
+      fs,
+    );
     await app.refresh();
     const r = await verifyStory(app, http, app.stories[0]!, () => undefined);
     expect(r.ipfs.state).toBe("ok");
