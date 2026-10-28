@@ -46,12 +46,22 @@ export function submissionRoutes(app: FastifyInstance, ctx: Ctx): void {
         await c.query(
           `INSERT INTO submissions (id, story_id, version, supersedes, contributor, body_ciphertext, wrapped_keys, media)
            VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb)`,
-          [id, b.storyId, b.version, b.supersedes, pk, b.bodyCiphertext, JSON.stringify(b.wrappedKeys), JSON.stringify(media)],
+          [
+            id,
+            b.storyId,
+            b.version,
+            b.supersedes,
+            pk,
+            b.bodyCiphertext,
+            JSON.stringify(b.wrappedKeys),
+            JSON.stringify(media),
+          ],
         );
         await recordEvent(c, { submissionId: id, actor: pk, event: "created", to: "draft" });
       });
     } catch (e) {
-      if (isUniqueViolation(e)) throw conflict("version_exists", "this story already has a submission for this version");
+      if (isUniqueViolation(e))
+        throw conflict("version_exists", "this story already has a submission for this version");
       throw e;
     }
     return reply.code(201).send({ id });
@@ -109,7 +119,8 @@ export function submissionRoutes(app: FastifyInstance, ctx: Ctx): void {
           return updated;
         });
       } catch (e) {
-        if (isUniqueViolation(e)) throw conflict("version_exists", "this story already has a submission for this version");
+        if (isUniqueViolation(e))
+          throw conflict("version_exists", "this story already has a submission for this version");
         throw e;
       }
       for (const sha of removed) await ctx.staging.removeMedia(id, sha);
@@ -176,8 +187,7 @@ export function submissionRoutes(app: FastifyInstance, ctx: Ctx): void {
       );
       const history = hist.rows.map((h) => {
         const prev = h.detail?.previous as
-          | { bodyCiphertext: string; wrappedKeys: Record<string, string>; media: MediaItem[] }
-          | undefined;
+          { bodyCiphertext: string; wrappedKeys: Record<string, string>; media: MediaItem[] } | undefined;
         return {
           at: h.at.toISOString(),
           actor: h.actor,

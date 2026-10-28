@@ -80,7 +80,8 @@ export class ArweaveStore {
     await this.ar.transactions.sign(tx, this.jwk);
     const uploader = await this.ar.transactions.getUploader(tx);
     while (!uploader.isComplete) await uploader.uploadChunk();
-    if (uploader.lastResponseStatus >= 400) throw new Error(`Arweave upload failed: HTTP ${uploader.lastResponseStatus}`);
+    if (uploader.lastResponseStatus >= 400)
+      throw new Error(`Arweave upload failed: HTTP ${uploader.lastResponseStatus}`);
     if (this.devMine) await this.ar.api.get("mine");
     return tx.id;
   }

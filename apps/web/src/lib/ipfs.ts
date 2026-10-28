@@ -194,7 +194,13 @@ export interface BlockSource {
   /** Skip the in-memory block cache (live checks in the Verify panel). */
   noCache?: boolean;
   /** Called for every attempt, so the caller can keep a scoreboard and flag gateways that serve wrong bytes. */
-  onReport?: (r: { base: string; url: string; ok: boolean; reason?: "mismatch" | "http" | "timeout" | "network"; ms: number }) => void;
+  onReport?: (r: {
+    base: string;
+    url: string;
+    ok: boolean;
+    reason?: "mismatch" | "http" | "timeout" | "network";
+    ms: number;
+  }) => void;
 }
 
 export class BlockFetchError extends Error {

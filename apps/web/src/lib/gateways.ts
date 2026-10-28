@@ -60,7 +60,10 @@ export interface ShaRef {
 }
 
 /** Fetch a file by its SHA-256 from IPFS gateways (own, pinning, public) and then Arweave. */
-export async function fetchBySha(ref: ShaRef, opts: { maxBytes?: number; timeoutMs?: number } = {}): Promise<Uint8Array> {
+export async function fetchBySha(
+  ref: ShaRef,
+  opts: { maxBytes?: number; timeoutMs?: number } = {},
+): Promise<Uint8Array> {
   const sources = sourcesFor({ cid: ref.cid, arweave: ref.arweave }, gateways, scoreboard);
   return fetchVerified({
     sources,

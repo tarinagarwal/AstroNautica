@@ -87,7 +87,7 @@ export class PublisherDb {
     const sets = ["state = $2", "updated_at = now()"];
     const vals: unknown[] = [id, state];
     for (const [k, v] of Object.entries(fields)) {
-      if (!/^[a-z_]+$/.test(k)) throw new Error(`bad column ${k}`);
+      if (!/^[a-z0-9_]+$/.test(k)) throw new Error(`bad column ${k}`);
       vals.push(v);
       sets.push(`${k} = $${vals.length}`);
     }

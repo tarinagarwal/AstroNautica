@@ -12,7 +12,8 @@ import { finalizeEvent, type Event } from "nostr-tools/pure";
 import type { AppData } from "./appData.js";
 import type { Api } from "../lib/api.js";
 
-export type AuditAction = "approve" | "reject" | "request_changes" | "unlist" | "hide" | "mute" | "claim" | "revoke_contributor";
+export type AuditAction =
+  "approve" | "reject" | "request_changes" | "unlist" | "hide" | "mute" | "claim" | "revoke_contributor";
 
 /** A moderator-signed audit event: kind 9737, tags per docs/architecture.md, empty content. */
 export function createAuditEvent(
@@ -28,7 +29,11 @@ export function createAuditEvent(
 }
 
 /** The newest copy of this signer's list, from what we hold and what relays have now. */
-export async function currentItems(app: AppData, author: string, name: ModeratorListName): Promise<ModeratorListItem[]> {
+export async function currentItems(
+  app: AppData,
+  author: string,
+  name: ModeratorListName,
+): Promise<ModeratorListItem[]> {
   const remote = await app.pool
     .query(app.relayUrls(), { kinds: [KIND_APP_DATA], authors: [author], "#d": [listD(name)] })
     .catch(() => [] as Event[]);
@@ -78,24 +83,48 @@ async function record(api: Api | null, fn: (api: Api) => Promise<unknown>): Prom
   }
 }
 
-export async function hideComment(app: AppData, api: Api | null, sk: Uint8Array, me: string, commentId: string): Promise<ModResult> {
+export async function hideComment(
+  app: AppData,
+  api: Api | null,
+  sk: Uint8Array,
+  me: string,
+  commentId: string,
+): Promise<ModResult> {
   const change = await changeList(app, sk, me, "hidden", [{ op: "add", value: commentId }]);
   const audit = createAuditEvent(sk, "hide", { extraTags: [["e", commentId]] });
   return { ...change, audit, auditError: await record(api, (a) => a.audit(audit)) };
 }
 
-export async function muteKey(app: AppData, api: Api | null, sk: Uint8Array, me: string, pubkey: string): Promise<ModResult> {
+export async function muteKey(
+  app: AppData,
+  api: Api | null,
+  sk: Uint8Array,
+  me: string,
+  pubkey: string,
+): Promise<ModResult> {
   const change = await changeList(app, sk, me, "muted", [{ op: "add", value: pubkey }]);
   const audit = createAuditEvent(sk, "mute", { extraTags: [["p", pubkey]] });
   return { ...change, audit, auditError: await record(api, (a) => a.audit(audit)) };
 }
 
-export async function unlistStory(app: AppData, api: Api | null, sk: Uint8Array, me: string, storyId: string): Promise<ModResult> {
+export async function unlistStory(
+  app: AppData,
+  api: Api | null,
+  sk: Uint8Array,
+  me: string,
+  storyId: string,
+): Promise<ModResult> {
   const change = await changeList(app, sk, me, "unlisted", [{ op: "add", value: storyId }]);
   const audit = createAuditEvent(sk, "unlist", { storyId });
   return { ...change, audit, auditError: await record(api, (a) => a.unlist(storyId, audit)) };
 }
 
-export async function setFeatured(app: AppData, sk: Uint8Array, me: string, storyId: string, on: boolean): Promise<ListChange> {
+export async function setFeatured(
+  app: AppData,
+  sk: Uint8Array,
+  me: string,
+  storyId: string,
+  on: boolean,
+): Promise<ListChange> {
   return changeList(app, sk, me, "featured", [{ op: on ? "add" : "remove", value: storyId }]);
 }

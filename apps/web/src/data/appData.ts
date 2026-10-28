@@ -5,7 +5,14 @@
  */
 import { KIND_APP_DATA, KIND_STORY, MODERATOR_LISTS, OWNER_LISTS, listD, storageD } from "@core/kinds.js";
 import { buildEffectiveLists, type EffectiveLists } from "@core/lists.js";
-import { parseStorageReceipt, selectStories, verifyManifest, type ManifestCheck, type StoryRef, type StorageReceipt } from "@core/stories.js";
+import {
+  parseStorageReceipt,
+  selectStories,
+  verifyManifest,
+  type ManifestCheck,
+  type StoryRef,
+  type StorageReceipt,
+} from "@core/stories.js";
 import type { PublishResult, Filter } from "@core/relays.js";
 import { verifyEventStrict } from "@core/keys.js";
 import type { Event } from "nostr-tools/pure";
@@ -92,7 +99,8 @@ export class AppData {
     }
     this.lists = buildEffectiveLists(this.owner, [...this.listEvents.values()]);
     setGateways(this.lists.gateways);
-    const hasOwnerLists = this.lists.relays.length > 0 || this.lists.gateways.length > 0 || this.lists.moderators.length > 0;
+    const hasOwnerLists =
+      this.lists.relays.length > 0 || this.lists.gateways.length > 0 || this.lists.moderators.length > 0;
     this.listsStatus = hasOwnerLists ? "ready" : this.listsStatus === "loading" ? "loading" : "none";
     // Re-select stories: unlisted entries or publisher keys may have changed.
     this.stories = selectStories([...this.storyEvents.values()], this.lists);
@@ -133,7 +141,11 @@ export class AppData {
     // The relay list may have grown, and moderators are now known: fetch moderator-signed lists everywhere.
     const signers = [this.owner, ...(this.lists?.activeModerators ?? [])];
     const modEvents = await this.pool
-      .query(this.relayUrls(), { kinds: [KIND_APP_DATA], authors: signers, "#d": [...OWNER_LISTS, ...MODERATOR_LISTS].map(listD) })
+      .query(this.relayUrls(), {
+        kinds: [KIND_APP_DATA],
+        authors: signers,
+        "#d": [...OWNER_LISTS, ...MODERATOR_LISTS].map(listD),
+      })
       .catch(() => [] as Event[]);
     this.offline = fromRelays.length === 0 && modEvents.length === 0 && this.relayUrls().length > 0;
     this.addListEvents(modEvents);

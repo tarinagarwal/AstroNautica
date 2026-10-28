@@ -27,7 +27,10 @@ export function Reactions({ story, events, post }: { story: StoryRef; events: Ev
     () => countReactions(events, story.address, app.lists ?? { muted: new Set() }, app.config.powDifficulty),
     [events, story.address, app.lists, app.config.powDifficulty],
   );
-  const mine = useMemo(() => (me ? myReactions(events, story.address, me) : new Set<Reaction>()), [events, story.address, me]);
+  const mine = useMemo(
+    () => (me ? myReactions(events, story.address, me) : new Set<Reaction>()),
+    [events, story.address, me],
+  );
 
   const react = async (r: Reaction) => {
     if (mine.has(r) || busy) return;

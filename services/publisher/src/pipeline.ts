@@ -188,7 +188,8 @@ export class Pipeline {
       const header = readFileSync(join(dir, "header"));
       const chunks = Array.from({ length: m.chunks }, (_, i) => new Uint8Array(readFileSync(join(dir, String(i)))));
       const plain = await decryptBytes({ header: new Uint8Array(header), chunks }, key);
-      if (!hexEquals(sha256Hex(plain), m.sha256)) throw new Error(`decrypted media does not match its hash ${m.sha256}`);
+      if (!hexEquals(sha256Hex(plain), m.sha256))
+        throw new Error(`decrypted media does not match its hash ${m.sha256}`);
       writeFileSync(this.work(row.id, "src", m.sha256), plain);
     }
     return { media: row.media.length };
@@ -209,18 +210,22 @@ export class Pipeline {
     if (!verifyApprovalSignature(body, row.approval)) throw new Error("approval signature does not verify");
     if (body.id !== row.story_id || body.version !== row.version || body.supersedes !== (row.supersedes ?? null))
       throw new Error("body id/version/supersedes differ from the submission");
-    if (npubToHex(body.contributor.pubkey) !== row.contributor) throw new Error("body contributor differs from submitter");
+    if (npubToHex(body.contributor.pubkey) !== row.contributor)
+      throw new Error("body contributor differs from submitter");
 
     const lists = await this.lists();
     const mod = npubToHex(row.approval.moderator);
-    if (mod !== lists.owner && !lists.activeModerators.has(mod)) throw new Error("approving moderator is no longer on the list");
+    if (mod !== lists.owner && !lists.activeModerators.has(mod))
+      throw new Error("approving moderator is no longer on the list");
     if ((await this.d.db.isContributorRevoked(row.contributor)) || lists.revokedContributors.has(row.contributor))
       throw new Error("contributor has been revoked");
 
     const kinds = new Map(row.media.map((m) => [m.sha256, m.kind]));
     for (const b of body.blocks) {
-      if (b.type === "image") for (const i of b.items) if (kinds.get(i.sha256) !== "image") throw new Error(`image ${i.sha256} missing`);
-      if (b.type === "video" && kinds.get(b.source.sha256) !== "video") throw new Error(`video ${b.source.sha256} missing`);
+      if (b.type === "image")
+        for (const i of b.items) if (kinds.get(i.sha256) !== "image") throw new Error(`image ${i.sha256} missing`);
+      if (b.type === "video" && kinds.get(b.source.sha256) !== "video")
+        throw new Error(`video ${b.source.sha256} missing`);
     }
     if (body.cover && kinds.get(body.cover.sha256) !== "image") throw new Error("cover image missing");
     const used = new Set(mediaHashes(body));
@@ -281,7 +286,12 @@ export class Pipeline {
           sha256: m.sha256,
           hlsFiles: listFiles(r.hlsDir).map((f) => relative(r.hlsDir, f)),
           mp4: { file: relative(dir, r.mp4.path), sha256: r.mp4.sha256 },
-          poster: { file: relative(dir, r.poster.path), sha256: r.poster.sha256, width: r.poster.width, height: r.poster.height },
+          poster: {
+            file: relative(dir, r.poster.path),
+            sha256: r.poster.sha256,
+            width: r.poster.width,
+            height: r.poster.height,
+          },
           preview: { file: relative(dir, r.preview.path), sha256: r.preview.sha256 },
           durationSec: r.durationSec,
           width: r.width,
@@ -309,7 +319,10 @@ export class Pipeline {
     for (const [sha, vid] of Object.entries(media.videos)) {
       const dir = this.work(row.id, "out", "vid", sha);
       const hlsDir = join(dir, readFileSync(join(dir, "hlsdir"), "utf8"));
-      const entries: DirEntry[] = vid.hlsFiles.map((f) => ({ path: f, content: new Uint8Array(readFileSync(join(hlsDir, f))) }));
+      const entries: DirEntry[] = vid.hlsFiles.map((f) => ({
+        path: f,
+        content: new Uint8Array(readFileSync(join(hlsDir, f))),
+      }));
       res.videos[sha] = {
         hlsDir: (await this.d.ipfs.addDirectory(entries)).cid,
         mp4: (await this.d.ipfs.addFile(new Uint8Array(readFileSync(join(dir, vid.mp4.file))))).cid,
@@ -335,7 +348,8 @@ export class Pipeline {
     for (const svc of services) {
       const client = new PinningClient(svc, this.d.fetch);
       const results = [];
-      for (const cid of cids) results.push({ cid, ...(await client.pin(cid, `azaad:${row.story_id}:${row.version}`, origins)) });
+      for (const cid of cids)
+        results.push({ cid, ...(await client.pin(cid, `azaad:${row.story_id}:${row.version}`, origins)) });
       const failed = results.filter((r) => r.status === "error");
       if (failed.length === results.length && results.length > 0)
         throw new Error(`pinning service ${svc.name} rejected every pin: ${failed[0]!.error}`);
@@ -358,7 +372,9 @@ export class Pipeline {
         ...vid.hlsFiles.map((f) => ({ path: `hls/${f}`, content: new Uint8Array(readFileSync(join(hlsDir, f))) })),
       ];
       // A directory `<name>/…` on IPFS so `<gateway>/ipfs/<cid>/` works as a BEP-19 web seed for the multi-file torrent.
-      const dirCid = (await this.d.ipfs.addDirectory(files.map((f) => ({ path: `${name}/${f.path}`, content: f.content })))).cid;
+      const dirCid = (
+        await this.d.ipfs.addDirectory(files.map((f) => ({ path: `${name}/${f.path}`, content: f.content })))
+      ).cid;
       const webSeeds = this.d.config.ipfsGateways.map((g) => `${g.replace(/\/+$/, "")}/ipfs/${dirCid}/`);
       const t = await createVideoTorrent({ name, files, webSeeds, seedDir: this.d.config.seedDir });
       out[sha] = { magnet: t.magnet, infoHash: t.infoHash, dirCid };
@@ -394,7 +410,10 @@ export class Pipeline {
         case "embed-story":
           return b;
         case "image":
-          return { type: "image", items: b.items.map((i) => ({ ...imageFields(i.sha256), ...(i.caption ? { caption: i.caption } : {}) })) };
+          return {
+            type: "image",
+            items: b.items.map((i) => ({ ...imageFields(i.sha256), ...(i.caption ? { caption: i.caption } : {}) })),
+          };
         case "video": {
           const v = media.videos[b.source.sha256]!;
           const c = ipfs.videos[b.source.sha256]!;
@@ -433,7 +452,8 @@ export class Pipeline {
 
     const v = validateManifest(manifest);
     if (!v.ok) throw new Error(`built manifest is invalid: ${v.errors.join("; ")}`);
-    if (!verifyApprovalSignature(manifest, manifest.approval)) throw new Error("approval does not verify against the manifest");
+    if (!verifyApprovalSignature(manifest, manifest.approval))
+      throw new Error("approval does not verify against the manifest");
     const bytes = new TextEncoder().encode(canonicalize(manifest));
     const sha = manifestSha256(manifest);
     writeFileSync(this.work(row.id, "manifest.json"), bytes);
@@ -444,7 +464,10 @@ export class Pipeline {
     return { cid, sha256: sha, publishedAt };
   }
 
-  private async manifestObj(row: SubmissionRow, steps: Record<string, StepRecord>): Promise<{ manifest: Manifest; bytes: Uint8Array; cid: string }> {
+  private async manifestObj(
+    row: SubmissionRow,
+    steps: Record<string, StepRecord>,
+  ): Promise<{ manifest: Manifest; bytes: Uint8Array; cid: string }> {
     const r = steps.manifest!.result as { cid: string; sha256: string };
     const path = this.work(row.id, "manifest.json");
     const bytes = existsSync(path) ? new Uint8Array(readFileSync(path)) : await this.d.ipfs.cat(r.cid);
@@ -457,16 +480,24 @@ export class Pipeline {
   private async nostr(row: SubmissionRow, steps: Record<string, StepRecord>) {
     const { manifest, cid } = await this.manifestObj(row, steps);
     const prev = steps.nostr?.result as { event?: Event } | undefined;
-    const event = prev?.event ?? createStoryEvent({ manifest, manifestCid: cid, secretKey: this.d.config.publisherSecretKey });
+    const event =
+      prev?.event ?? createStoryEvent({ manifest, manifestCid: cid, secretKey: this.d.config.publisherSecretKey });
     const relays = publishRelays(await this.lists(), this.d.config.bootstrapRelays);
     const results = await this.d.relays.publish(relays, event);
     const ok = results.filter((r) => r.ok).length;
     const required = Math.min(this.d.config.requiredRelaySuccesses, relays.length);
     if (ok < required) {
       // Keep the signed event so the retry republishes the same one.
-      steps.nostr = { done: false, result: { event }, attempts: steps.nostr?.attempts ?? 0, at: new Date().toISOString() };
+      steps.nostr = {
+        done: false,
+        result: { event },
+        attempts: steps.nostr?.attempts ?? 0,
+        at: new Date().toISOString(),
+      };
       await this.d.db.saveStep(row.id, "nostr", steps.nostr);
-      throw new Error(`story event accepted by ${ok}/${relays.length} relays, need ${required}: ${JSON.stringify(results)}`);
+      throw new Error(
+        `story event accepted by ${ok}/${relays.length} relays, need ${required}: ${JSON.stringify(results)}`,
+      );
     }
     await this.d.db.setSubmissionState(row.id, "published", { published_at: new Date() });
     return { event, relays: results };
@@ -507,7 +538,12 @@ export class Pipeline {
     const prev = (steps.arweave?.result ?? {}) as { tx?: Record<string, string> };
     const tx: Record<string, string> = { ...(prev.tx ?? {}) };
     const save = () =>
-      this.d.db.saveStep(row.id, "arweave", { done: false, result: { tx }, attempts: steps.arweave?.attempts ?? 0, at: new Date().toISOString() });
+      this.d.db.saveStep(row.id, "arweave", {
+        done: false,
+        result: { tx },
+        attempts: steps.arweave?.attempts ?? 0,
+        at: new Date().toISOString(),
+      });
     const put = async (sha: string, getBytes: () => Promise<Uint8Array>, contentType: string) => {
       if (tx[sha]) return;
       const data = await getBytes();
@@ -519,7 +555,8 @@ export class Pipeline {
 
     for (const [sha, img] of Object.entries(media.images)) {
       await put(sha, fromIpfs(ipfs.images[sha]!.cid), img.mime);
-      for (const [w, v] of Object.entries(img.variants)) await put(v.sha256, fromIpfs(ipfs.images[sha]!.variants[w]!), "image/webp");
+      for (const [w, v] of Object.entries(img.variants))
+        await put(v.sha256, fromIpfs(ipfs.images[sha]!.variants[w]!), "image/webp");
     }
     for (const [sha, vid] of Object.entries(media.videos)) {
       await put(vid.poster.sha256, fromIpfs(ipfs.videos[sha]!.poster), "image/jpeg");
@@ -542,17 +579,22 @@ export class Pipeline {
     const prev = steps["storage-receipt"]?.result as { event?: Event } | undefined;
     const event =
       prev?.event ??
-      createStorageReceiptEvent({ storyId: row.story_id, version: row.version, manifestSha256: msha, arweave: tx }, this.d.config.publisherSecretKey);
+      createStorageReceiptEvent(
+        { storyId: row.story_id, version: row.version, manifestSha256: msha, arweave: tx },
+        this.d.config.publisherSecretKey,
+      );
     const relays = publishRelays(await this.lists(), this.d.config.bootstrapRelays);
     const results = await this.d.relays.publish(relays, event);
-    if (!results.some((r) => r.ok)) throw new Error(`no relay accepted the storage receipt: ${JSON.stringify(results)}`);
+    if (!results.some((r) => r.ok))
+      throw new Error(`no relay accepted the storage receipt: ${JSON.stringify(results)}`);
     return { event, relays: results };
   }
 
   // ---- Finalize: pin status, clean up staging (spec §5.2) ----
 
   private async finalize(row: SubmissionRow, steps: Record<string, StepRecord>) {
-    const pins = steps.pin?.result as Record<string, { requestid?: string; cid: string }[]> | { skipped: string } | undefined;
+    const pins = steps.pin?.result as
+      Record<string, { requestid?: string; cid: string }[]> | { skipped: string } | undefined;
     const pinStatus: Record<string, Record<string, string>> = {};
     if (pins && !("skipped" in pins)) {
       for (const svc of this.d.config.pinningServices) {

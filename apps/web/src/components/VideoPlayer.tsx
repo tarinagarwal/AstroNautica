@@ -51,7 +51,12 @@ export function VideoPlayer({ block, title }: { block: VideoBlock; title: string
     try {
       const Hls = (await import("hls.js")).default;
       if (!Hls.isSupported()) return playMp4();
-      const hls = new Hls({ loader: makeVerifiedLoader(), enableWorker: false, fragLoadingMaxRetry: 2, manifestLoadingMaxRetry: 1 });
+      const hls = new Hls({
+        loader: makeVerifiedLoader(),
+        enableWorker: false,
+        fragLoadingMaxRetry: 2,
+        manifestLoadingMaxRetry: 1,
+      });
       cleanup.current = () => hls.destroy();
       let fellBack = false;
       hls.on(Hls.Events.ERROR, (_e, data) => {
@@ -73,7 +78,14 @@ export function VideoPlayer({ block, title }: { block: VideoBlock; title: string
   return (
     <figure className="video" data-testid="video-block">
       <div className="video-frame">
-        <video ref={video} controls={mode !== "idle"} poster={poster} preload="none" playsInline aria-label={title || t("video.label")} />
+        <video
+          ref={video}
+          controls={mode !== "idle"}
+          poster={poster}
+          preload="none"
+          playsInline
+          aria-label={title || t("video.label")}
+        />
         {mode === "idle" && (
           <button type="button" className="play" onClick={() => void start()} aria-label={t("video.play")}>
             ▶

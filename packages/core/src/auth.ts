@@ -1,6 +1,7 @@
 import { sha256Hex } from "@azaadawaaz/schema";
 import { finalizeEvent, type Event } from "nostr-tools/pure";
 import { toPubkeyHex, verifyEventStrict } from "./keys.js";
+import { KIND_AUDIT } from "./kinds.js";
 
 /** NIP-98 HTTP auth event kind. */
 export const KIND_HTTP_AUTH = 27235;
@@ -28,9 +29,11 @@ export function createAuthHeader(
   body?: Uint8Array | string,
   createdAt = Math.floor(Date.now() / 1000),
 ): string {
+  // A random nonce keeps two identical requests in the same second from sharing an event id (the API rejects replays).
   const tags = [
     ["u", url],
     ["method", method.toUpperCase()],
+    ["nonce", randomCode()],
   ];
   if (body !== undefined && (typeof body === "string" ? body.length : body.length) > 0) {
     tags.push(["payload", sha256Hex(body)]);
@@ -157,4 +160,34 @@ function randomCode(): string {
   const b = new Uint8Array(16);
   globalThis.crypto.getRandomValues(b);
   return Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+}
+
+// ---- Moderation audit events (docs/architecture.md) ----
+
+export type AuditAction =
+  | "approve"
+  | "reject"
+  | "request_changes"
+  | "unlist"
+  | "hide"
+  | "mute"
+  | "claim"
+  | "revoke_contributor";
+
+/**
+ * A moderator-signed audit event (kind 9737). `s` is sha256(submission id) so rejected submissions stay unidentifiable;
+ * `story` is added for approve and unlist; `e`/`p` name the hidden comment or muted/revoked key.
+ */
+export function createAuditEvent(
+  args: { action: AuditAction; submissionId?: string; storyId?: string; eventId?: string; pubkey?: string },
+  secretKey: Uint8Array,
+  createdAt = Math.floor(Date.now() / 1000),
+): Event {
+  const tags: string[][] = [["action", args.action]];
+  if (args.submissionId) tags.push(["s", sha256Hex(args.submissionId)]);
+  if (args.storyId && (args.action === "approve" || args.action === "unlist")) tags.push(["story", args.storyId]);
+  if (args.eventId) tags.push(["e", args.eventId]);
+  if (args.pubkey) tags.push(["p", args.pubkey]);
+  tags.push(["nonce", randomCode()]);
+  return finalizeEvent({ kind: KIND_AUDIT, created_at: createdAt, tags, content: "" }, secretKey);
 }

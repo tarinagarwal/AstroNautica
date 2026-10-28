@@ -105,6 +105,24 @@ function parsePublicUrls(urls: string[]): { publicUrls: string[]; basePath: stri
   return { publicUrls: parsed.map((p) => p.base), basePath };
 }
 
+/** Build a connection URL from DATABASE_HOST/PORT/NAME/USER and DATABASE_PASSWORD(_FILE) (docker secrets). */
+function databaseUrlFromParts(env: NodeJS.ProcessEnv): string | undefined {
+  if (!env.DATABASE_HOST) return undefined;
+  if (!env.DATABASE_NAME || !env.DATABASE_USER)
+    throw new ConfigError("DATABASE_HOST needs DATABASE_NAME and DATABASE_USER");
+  let password = env.DATABASE_PASSWORD ?? "";
+  if (env.DATABASE_PASSWORD_FILE) {
+    try {
+      password = readFileSync(env.DATABASE_PASSWORD_FILE, "utf8").replace(/\r?\n$/, "");
+    } catch {
+      throw new ConfigError("cannot read DATABASE_PASSWORD_FILE");
+    }
+  }
+  const auth = encodeURIComponent(env.DATABASE_USER) + (password ? `:${encodeURIComponent(password)}` : "");
+  const port = parseIntVar("DATABASE_PORT", env.DATABASE_PORT, 5432);
+  return `postgres://${auth}@${env.DATABASE_HOST}:${port}/${encodeURIComponent(env.DATABASE_NAME)}`;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd: string = process.cwd()): Config {
   const found = findDevConfig(cwd);
   let dev: DevConfig = {};
@@ -120,8 +138,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd: string = p
   const publicUrlRaw = parseList(env.PUBLIC_URL) ?? (dev.apiUrl ? [dev.apiUrl] : [`http://127.0.0.1:${port}`]);
   const { publicUrls, basePath } = parsePublicUrls(publicUrlRaw);
 
-  const databaseUrl = env.DATABASE_URL || dev.databaseUrl;
-  if (!databaseUrl) throw new ConfigError("DATABASE_URL is required (or .dev/config.json databaseUrl)");
+  const databaseUrl = env.DATABASE_URL || databaseUrlFromParts(env) || dev.databaseUrl;
+  if (!databaseUrl)
+    throw new ConfigError("DATABASE_URL (or DATABASE_HOST/NAME/USER[/PASSWORD_FILE]) is required, or .dev/config.json");
+  if (env.TRUST_PROXY !== undefined && env.TRUST_PROXY.toLowerCase() !== "false")
+    throw new ConfigError("TRUST_PROXY is always off: the API must never see client addresses");
 
   const ownerRaw = env.OWNER_PUBKEY || dev.ownerPubkey;
   if (!ownerRaw) throw new ConfigError("OWNER_PUBKEY is required (or .dev/config.json ownerPubkey)");

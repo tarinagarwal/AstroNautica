@@ -18,6 +18,7 @@ import {
   type ModeratorEntry,
   type ServiceKeyEntry,
 } from "@azaadawaaz/core";
+import { scrubAddresses } from "./privacy.js";
 
 export interface RelayQuery {
   query(relays: string[], filter: Filter, timeoutMs?: number): Promise<Event[]>;
@@ -191,7 +192,7 @@ export class ListsService {
         this.cached = undefined;
       }
     } catch (e) {
-      this.opts.log?.warn({ err: e instanceof Error ? e.message : String(e) }, "list refresh failed");
+      this.opts.log?.warn({ err: scrubAddresses(e instanceof Error ? e.message : String(e)) }, "list refresh failed");
     }
   }
 

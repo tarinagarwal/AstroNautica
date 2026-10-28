@@ -60,7 +60,12 @@ export async function writeReceipt(args: {
     const r = await pub.waitForTransactionReceipt({ hash: args.pendingTx, timeout: 120_000 }).catch(() => null);
     if (r?.status === "success") {
       const block = await pub.getBlock({ blockNumber: r.blockNumber });
-      return { ...base, txHash: args.pendingTx, blockNumber: r.blockNumber.toString(), timestamp: Number(block.timestamp) };
+      return {
+        ...base,
+        txHash: args.pendingTx,
+        blockNumber: r.blockNumber.toString(),
+        timestamp: Number(block.timestamp),
+      };
     }
   }
   const ts = await existing();

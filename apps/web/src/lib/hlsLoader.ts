@@ -50,7 +50,8 @@ export function makeVerifiedLoader(fetchPath: PathFetcher = (p) => fetchByPath(p
         (bytes) => {
           if (this.aborted) return;
           let data = bytes;
-          if (context.rangeEnd || context.rangeStart) data = bytes.subarray(context.rangeStart ?? 0, context.rangeEnd || undefined);
+          if (context.rangeEnd || context.rangeStart)
+            data = bytes.subarray(context.rangeStart ?? 0, context.rangeEnd || undefined);
           stats.loading.first = stats.loading.end = performance.now();
           stats.loaded = stats.total = data.length;
           const payload =

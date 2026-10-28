@@ -83,7 +83,10 @@ describe("invite redemption", () => {
     expect(r1.body.message).toBe("invite is not signed by the owner");
     // owner pubkey but edited content (e.g. extended expiry)
     const real = createInvite(env.owner.kp.secretKey, { expiresAt: Math.floor(Date.now() / 1000) - 10 });
-    const edited: Event = { ...real.event, content: JSON.stringify({ ...JSON.parse(real.event.content), expiresAt: 9e9 }) };
+    const edited: Event = {
+      ...real.event,
+      content: JSON.stringify({ ...JSON.parse(real.event.content), expiresAt: 9e9 }),
+    };
     const r2 = await redeem(createRedemption(edited, generateKeyPair().secretKey));
     expect(r2.status).toBe(400);
     expect(r2.body.message).toBe("bad invite signature");
@@ -91,7 +94,12 @@ describe("invite redemption", () => {
     const ok = createInvite(env.owner.kp.secretKey);
     const kp = generateKeyPair();
     const mismatch = finalizeEvent(
-      { kind: 9740, created_at: Math.floor(Date.now() / 1000), tags: [["e", "f".repeat(64)]], content: JSON.stringify(ok.event) },
+      {
+        kind: 9740,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [["e", "f".repeat(64)]],
+        content: JSON.stringify(ok.event),
+      },
       kp.secretKey,
     );
     expect((await redeem(mismatch)).body.message).toBe("redemption does not match invite");
@@ -107,9 +115,13 @@ describe("invite redemption", () => {
   it("rejects a key that is already a contributor", async () => {
     const kp = await newContributor(env);
     const invite = createInvite(env.owner.kp.secretKey);
-    const r = await env.client(kp).post("/invites/redeem", { redemption: createRedemption(invite.event, kp.secretKey) }, {
-      noAuth: true,
-    });
+    const r = await env.client(kp).post(
+      "/invites/redeem",
+      { redemption: createRedemption(invite.event, kp.secretKey) },
+      {
+        noAuth: true,
+      },
+    );
     expect(r.status).toBe(409);
     expect(r.body.error).toBe("already_contributor");
   });
@@ -147,30 +159,45 @@ describe("contributor revocation", () => {
     expect(create.body.message).toBe("this contributor has been revoked");
     expect((await s.c.put(`/submissions/${s.id}`, s.draft.request)).status).toBe(403);
     expect((await s.c.post(`/submissions/${s.id}/submit`)).status).toBe(403);
-    expect((await s.c.putRaw(`/submissions/${s.id}/media/${s.draft.media[0]!.sha256}/header`, s.draft.media[0]!.header)).status).toBe(403);
+    expect(
+      (await s.c.putRaw(`/submissions/${s.id}/media/${s.draft.media[0]!.sha256}/header`, s.draft.media[0]!.header))
+        .status,
+    ).toBe(403);
     expect((await s.c.get("/me/submissions")).status).toBe(200);
     expect((await s.c.get(`/submissions/${s.id}`)).status).toBe(200);
 
     const list = await env.client(env.mod1).get("/contributors");
     expect(list.body.find((c: { pubkey: string }) => c.pubkey === pk).revokedAt).not.toBeNull();
     const audit = await env.client(env.owner).get("/audit");
-    expect(audit.body.events.some((e: { action: string; actor: string }) => e.action === "revoke_contributor" && e.actor === env.mod1.kp.pubkey)).toBe(true);
     expect(
-      env.forwarded.events.some((e) => e.pubkey === env.mod1.kp.pubkey && e.tags.some((t) => t[0] === "p" && t[1] === pk)),
+      audit.body.events.some(
+        (e: { action: string; actor: string }) => e.action === "revoke_contributor" && e.actor === env.mod1.kp.pubkey,
+      ),
+    ).toBe(true);
+    expect(
+      env.forwarded.events.some(
+        (e) => e.pubkey === env.mod1.kp.pubkey && e.tags.some((t) => t[0] === "p" && t[1] === pk),
+      ),
     ).toBe(true);
     const alerts = await env.client(env.owner).get("/owner/alerts");
     expect(alerts.body.some((a: { kind: string }) => a.kind === "contributor_revoked")).toBe(true);
     // unknown contributor
     const unknown = generateKeyPair().pubkey;
     expect(
-      (await env.client(env.mod1).post(`/contributors/${unknown}/revoke`, { auditEvent: auditEvent(env.mod1.kp, "revoke_contributor", { p: unknown }) })).status,
+      (
+        await env.client(env.mod1).post(`/contributors/${unknown}/revoke`, {
+          auditEvent: auditEvent(env.mod1.kp, "revoke_contributor", { p: unknown }),
+        })
+      ).status,
     ).toBe(404);
   });
 
   it("a contributor on a moderator's signed revoked list is blocked too", async () => {
     const kp = await newContributor(env);
     const draft = await makeDraft(env, kp);
-    env.lists.feed([createListEvent("revoked-contributors", [[kp.pubkey, Math.floor(Date.now() / 1000)]], env.mod2.kp.secretKey)]);
+    env.lists.feed([
+      createListEvent("revoked-contributors", [[kp.pubkey, Math.floor(Date.now() / 1000)]], env.mod2.kp.secretKey),
+    ]);
     const r = await env.client(kp).post("/submissions", draft.request);
     expect(r.status).toBe(403);
   });

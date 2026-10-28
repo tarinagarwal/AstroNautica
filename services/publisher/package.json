@@ -21,6 +21,7 @@
   "dependencies": {
     "@azaadawaaz/contracts": "workspace:*",
     "@azaadawaaz/core": "workspace:*",
+    "@azaadawaaz/media": "workspace:*",
     "@azaadawaaz/schema": "workspace:*",
     "arweave": "^2.1.0",
     "create-torrent": "^6.1.3",

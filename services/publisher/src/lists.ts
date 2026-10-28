@@ -21,13 +21,18 @@ export async function loadLists(args: {
     }
   }
   const relays = [...new Set(args.relays)];
-  events.push(...(await args.pool.query(relays, { kinds: [KIND_APP_DATA], authors: [args.ownerPubkey] }, args.timeoutMs)));
+  events.push(
+    ...(await args.pool.query(relays, { kinds: [KIND_APP_DATA], authors: [args.ownerPubkey] }, args.timeoutMs)),
+  );
   const first = buildEffectiveLists(args.ownerPubkey, events);
   const official = [...new Set([...relays, ...first.relays.map((r) => r.url)])];
   const mods = [...first.activeModerators];
-  if (mods.length) events.push(...(await args.pool.query(official, { kinds: [KIND_APP_DATA], authors: mods }, args.timeoutMs)));
+  if (mods.length)
+    events.push(...(await args.pool.query(official, { kinds: [KIND_APP_DATA], authors: mods }, args.timeoutMs)));
   if (official.length > relays.length)
-    events.push(...(await args.pool.query(official, { kinds: [KIND_APP_DATA], authors: [args.ownerPubkey] }, args.timeoutMs)));
+    events.push(
+      ...(await args.pool.query(official, { kinds: [KIND_APP_DATA], authors: [args.ownerPubkey] }, args.timeoutMs)),
+    );
   return buildEffectiveLists(args.ownerPubkey, events);
 }
 

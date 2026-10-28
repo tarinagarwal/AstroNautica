@@ -17,6 +17,7 @@ import { moderationRoutes } from "./routes/moderation.js";
 import { ownerRoutes } from "./routes/owner.js";
 import { publicRoutes } from "./routes/public.js";
 import { submissionRoutes } from "./routes/submissions.js";
+import { scrubAddresses } from "./privacy.js";
 import { MAX_CHUNK_CIPHERTEXT, StagingStore } from "./staging.js";
 
 export interface ServerDeps {
@@ -31,6 +32,12 @@ export interface ServerDeps {
 
 /** Log serializers: only the method, the route pattern (no ids or query) and the status code. */
 export const logSerializers = {
+  err: (err: Error & { code?: unknown; statusCode?: unknown }) => ({
+    type: err?.name,
+    message: scrubAddresses(String(err?.message ?? "")),
+    stack: scrubAddresses(String(err?.stack ?? "")),
+    ...(typeof err?.code === "string" ? { code: err.code } : {}),
+  }),
   req: (req: { method?: string; routeOptions?: { url?: string } }) => ({
     method: req.method,
     route: req.routeOptions?.url ?? "unmatched",
@@ -75,6 +82,8 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       : {
           level: deps.logger?.level ?? config.logLevel,
           serializers: logSerializers,
+          // No pid/hostname base fields either: only what the serializers allow.
+          base: null,
           ...(deps.logger?.stream ? { stream: deps.logger.stream } : {}),
         };
 

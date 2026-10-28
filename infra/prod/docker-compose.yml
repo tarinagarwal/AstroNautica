@@ -11,7 +11,7 @@
 #
 # Networks:
 #   edge     - reachable from the internet through published ports (web, seedbox, ipfs swarm)
-#   backend  - internal only (no internet): postgres, api, media, relay, ipfs RPC, seedbox RPC
+#   backend  - internal only (no internet): postgres, api, relay, ipfs RPC, seedbox RPC
 #   egress   - outbound internet for the publisher (Arweave, EVM RPCs, other relays)
 #
 # Privacy (spec §12): no service logs client addresses. web and relay are also
@@ -31,14 +31,14 @@ x-no-logs: &no-logs
     driver: none
 
 secrets:
-  postgres_password:    { file: ./secrets/postgres_password }
-  publisher_nostr_key:  { file: ./secrets/publisher_nostr_key }
+  postgres_password: { file: ./secrets/postgres_password }
+  publisher_nostr_key: { file: ./secrets/publisher_nostr_key }
   publisher_x25519_key: { file: ./secrets/publisher_x25519_key }
-  arweave_wallet:       { file: ./secrets/arweave_wallet.json }
-  evm_private_key:      { file: ./secrets/evm_private_key }
+  arweave_wallet: { file: ./secrets/arweave_wallet.json }
+  evm_private_key: { file: ./secrets/evm_private_key }
   seedbox_rpc_password: { file: ./secrets/seedbox_rpc_password }
-  tls_fullchain:        { file: ./secrets/tls_fullchain.pem }
-  tls_privkey:          { file: ./secrets/tls_privkey.pem }
+  tls_fullchain: { file: ./secrets/tls_fullchain.pem }
+  tls_privkey: { file: ./secrets/tls_privkey.pem }
 
 networks:
   edge:
@@ -48,14 +48,14 @@ networks:
 
 volumes:
   postgres-data:
-  staging:        # encrypted submission blobs (api writes, media/publisher read)
-  seed:           # published video files (complete/), shared with the seedbox
-  seed-watch:     # .torrent files the publisher drops for the seedbox to pick up
+  staging: # encrypted submission blobs (api writes, publisher reads)
+  seed: # published video files (complete/), shared with the seedbox
+  seed-watch: # .torrent files the publisher drops for the seedbox to pick up
   relay-db:
   ipfs-data:
   seedbox-config:
-  onion-keys:     # Tor onion service keys - BACK UP ENCRYPTED, IN TWO PLACES
-  onion-sockets:  # unix sockets between web (nginx) and onion (tor)
+  onion-keys: # Tor onion service keys - BACK UP ENCRYPTED, IN TWO PLACES
+  onion-sockets: # unix sockets between web (nginx) and onion (tor)
   acme:
 
 services:
@@ -68,8 +68,18 @@ services:
       POSTGRES_USER: azaad
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     secrets: [postgres_password]
-    command: ["postgres", "-c", "log_connections=off", "-c", "log_disconnections=off",
-              "-c", "log_hostname=off", "-c", "password_encryption=scram-sha-256"]
+    command:
+      [
+        "postgres",
+        "-c",
+        "log_connections=off",
+        "-c",
+        "log_disconnections=off",
+        "-c",
+        "log_hostname=off",
+        "-c",
+        "password_encryption=scram-sha-256",
+      ]
     volumes: ["postgres-data:/var/lib/postgresql/data"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U azaad -d azaadawaaz"]
@@ -106,33 +116,20 @@ services:
 
   # Media parsers are an attack surface (spec §12): no network at all beyond
   # the internal one, read-only root, no capabilities, bounded resources.
+  # Media processing (services/media) is a library the publisher runs in-process, with ffmpeg and sharp sandboxed
+  # in child processes and worker threads; there is no separate media server. The media image builds the CLI for
+  # manual runs: docker compose run --rm --profile tools media image <in> <out>.
   media:
     <<: *hardening
+    profiles: [tools]
     build:
       context: ../..
       dockerfile: services/media/Dockerfile
     image: azaadawaaz/media:${RELEASE:-latest}
-    networks: [backend]
+    network_mode: none
     read_only: true
     tmpfs: ["/tmp:size=4g"]
     cap_drop: [ALL]
-    pids_limit: 256
-    mem_limit: 4g
-    environment:
-      NODE_ENV: production
-      PORT: "3001"
-      DATABASE_HOST: postgres
-      DATABASE_NAME: azaadawaaz
-      DATABASE_USER: azaad
-      DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
-      STAGING_DIR: /var/lib/azaadawaaz/staging
-      SEED_DIR: /var/lib/azaadawaaz/seed
-    secrets: [postgres_password]
-    volumes:
-      - staging:/var/lib/azaadawaaz/staging
-      - seed:/var/lib/azaadawaaz/seed
-    depends_on:
-      postgres: { condition: service_healthy }
 
   # The only holder of the publisher key (spec §12). Rotate by replacing the
   # secret file and `docker compose up -d publisher`.
@@ -253,7 +250,7 @@ services:
       - "51413:51413/udp"
     volumes:
       - seedbox-config:/config
-      - seed:/downloads        # Transmission's download-dir is /downloads/complete
+      - seed:/downloads # Transmission's download-dir is /downloads/complete
       - seed-watch:/watch
 
   web:

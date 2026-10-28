@@ -48,15 +48,21 @@ export function ownerRoutes(app: FastifyInstance, ctx: Ctx): void {
     const r = await ctx.pool.query(
       "SELECT id, kind, detail, created_at FROM owner_alerts WHERE seen_at IS NULL ORDER BY id DESC LIMIT 1000",
     );
-    return r.rows.map((a) => ({ id: Number(a.id), kind: a.kind, detail: a.detail, createdAt: a.created_at.toISOString() }));
+    return r.rows.map((a) => ({
+      id: Number(a.id),
+      kind: a.kind,
+      detail: a.detail,
+      createdAt: a.created_at.toISOString(),
+    }));
   });
 
   app.post("/owner/alerts/seen", owner, async (req) => {
     const body = parse(alertsSeenBody, req.body);
     const r = body?.ids
-      ? await ctx.pool.query("UPDATE owner_alerts SET seen_at = now() WHERE seen_at IS NULL AND id = ANY($1::bigint[])", [
-          body.ids,
-        ])
+      ? await ctx.pool.query(
+          "UPDATE owner_alerts SET seen_at = now() WHERE seen_at IS NULL AND id = ANY($1::bigint[])",
+          [body.ids],
+        )
       : await ctx.pool.query("UPDATE owner_alerts SET seen_at = now() WHERE seen_at IS NULL");
     return { seen: r.rowCount ?? 0 };
   });

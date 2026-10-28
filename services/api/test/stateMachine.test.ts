@@ -273,9 +273,14 @@ describe("state transitions over HTTP", () => {
 
   it("re-wrapping is only possible while a submission is under moderation", async () => {
     const s = await inReviewSubmission(env);
-    expect((await env.client(env.mod1).post(`/submissions/${s.id}/keys`, { wrappedKeys: s.draft.request.wrappedKeys })).status).toBe(200);
+    expect(
+      (await env.client(env.mod1).post(`/submissions/${s.id}/keys`, { wrappedKeys: s.draft.request.wrappedKeys }))
+        .status,
+    ).toBe(200);
     expect((await approve(s)).status).toBe(200);
-    const r = await env.client(env.mod1).post(`/submissions/${s.id}/keys`, { wrappedKeys: s.draft.request.wrappedKeys });
+    const r = await env
+      .client(env.mod1)
+      .post(`/submissions/${s.id}/keys`, { wrappedKeys: s.draft.request.wrappedKeys });
     expect(r.status).toBe(409);
   });
 

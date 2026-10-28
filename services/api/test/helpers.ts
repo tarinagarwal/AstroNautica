@@ -37,7 +37,7 @@ import { ListsService } from "../src/lists.js";
 import { runMigrations } from "../src/migrate.js";
 import { buildServer } from "../src/server.js";
 
-export const TEST_DB_URL = process.env.TEST_DATABASE_URL ?? "postgres://postgres:test@127.0.0.1:55432/azaad_test";
+export const TEST_DB_URL = process.env.TEST_DATABASE_URL ?? "postgres://azaad:azaad@127.0.0.1:5432/azaadawaaz_test";
 export const PUBLIC_URL = "http://api.test:8787";
 
 export interface Actor {
@@ -67,7 +67,7 @@ export class RecordingForwarder implements AuditForwarder {
   }
 }
 
-async function createDatabase(): Promise<{ url: string; drop: () => Promise<void> }> {
+export async function createDatabase(): Promise<{ url: string; drop: () => Promise<void> }> {
   const name = `api_t_${randomBytes(6).toString("hex")}`;
   const admin = new pg.Client({ connectionString: TEST_DB_URL });
   await admin.connect();
@@ -86,7 +86,9 @@ async function createDatabase(): Promise<{ url: string; drop: () => Promise<void
   };
 }
 
-export function testConfig(over: Partial<Config> & { stagingDir: string; databaseUrl: string; ownerPubkey: string }): Config {
+export function testConfig(
+  over: Partial<Config> & { stagingDir: string; databaseUrl: string; ownerPubkey: string },
+): Config {
   return {
     port: 8787,
     host: "127.0.0.1",
@@ -252,7 +254,8 @@ export class TestClient {
       o.json !== undefined ? JSON.stringify(o.json) : o.raw ? Buffer.from(o.raw) : undefined;
     const headers: Record<string, string> = {};
     if (payload !== undefined)
-      headers["content-type"] = o.contentType ?? (o.json !== undefined ? "application/json" : "application/octet-stream");
+      headers["content-type"] =
+        o.contentType ?? (o.json !== undefined ? "application/json" : "application/octet-stream");
     if (!o.noAuth) {
       const auth =
         o.header ??
@@ -293,9 +296,13 @@ export class TestClient {
 export async function newContributor(env: TestEnv): Promise<KeyPair> {
   const kp = generateKeyPair();
   const invite = createInvite(env.owner.kp.secretKey, { note: "test" });
-  const r = await env.client(kp).post("/invites/redeem", { redemption: createRedemption(invite.event, kp.secretKey) }, {
-    noAuth: true,
-  });
+  const r = await env.client(kp).post(
+    "/invites/redeem",
+    { redemption: createRedemption(invite.event, kp.secretKey) },
+    {
+      noAuth: true,
+    },
+  );
   if (r.status !== 201) throw new Error(`redeem failed: ${r.status} ${JSON.stringify(r.body)}`);
   return kp;
 }
@@ -388,7 +395,13 @@ export async function makeDraft(
       supersedes: opts.supersedes ?? null,
       bodyCiphertext: await encryptJson(body, contentKey),
       wrappedKeys: await wrapKeyFor(contentKey, opts.recipients ?? recipients(env)),
-      media: media.map((m) => ({ sha256: m.sha256, size: m.size, mime: m.mime, kind: m.kind, chunks: m.chunks.length })),
+      media: media.map((m) => ({
+        sha256: m.sha256,
+        size: m.size,
+        mime: m.mime,
+        kind: m.kind,
+        chunks: m.chunks.length,
+      })),
     },
   };
 }
@@ -468,7 +481,8 @@ export function nowIso(offsetSec = 0): string {
  */
 export async function approvePayload(env: TestEnv, mod: Actor, s: Sub, approvedAt?: string) {
   const r = await env.client(mod).get(`/submissions/${s.id}?x25519=${mod.x.publicKey}`);
-  if (r.status !== 200 || !r.body.wrappedKey) throw new Error(`fetch for approval: ${r.status} ${JSON.stringify(r.body)}`);
+  if (r.status !== 200 || !r.body.wrappedKey)
+    throw new Error(`fetch for approval: ${r.status} ${JSON.stringify(r.body)}`);
   const key = await unwrapKey(r.body.wrappedKey, mod.x);
   const body = await decryptJson<ApprovalBody>(r.body.bodyCiphertext, key);
   return {

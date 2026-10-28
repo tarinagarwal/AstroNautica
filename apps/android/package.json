@@ -1,0 +1,74 @@
+{
+  "name": "@azaadawaaz/android",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "gen-defaults": "node scripts/gen-defaults.mjs",
+    "copy-fonts": "node scripts/copy-fonts.mjs",
+    "start": "react-native start",
+    "android": "react-native run-android",
+    "pretypecheck": "node scripts/gen-defaults.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretest": "node scripts/gen-defaults.mjs",
+    "test": "jest",
+    "bundle": "node scripts/gen-defaults.mjs && react-native bundle --platform android --dev false --entry-file index.js --bundle-output build/index.android.bundle --assets-dest build/res",
+    "codegen": "node scripts/run-codegen.mjs",
+    "release:keystore": "sh scripts/create-release-keystore.sh",
+    "release:build": "sh scripts/build-release.sh",
+    "release:entry": "node scripts/release-entry.mjs"
+  },
+  "dependencies": {
+    "@azaadawaaz/contracts": "workspace:*",
+    "@azaadawaaz/core": "workspace:*",
+    "@azaadawaaz/media-strip": "workspace:*",
+    "@azaadawaaz/schema": "workspace:*",
+    "@noble/curves": "^2.0.0",
+    "@noble/hashes": "^2.0.0",
+    "blurhash": "^2.0.5",
+    "libsodium-wrappers": "0.7.15",
+    "markdown-it": "^14.1.0",
+    "nostr-tools": "^2.17.0",
+    "react": "19.3.0",
+    "react-native": "0.88.1",
+    "react-native-get-random-values": "^2.0.0",
+    "react-native-safe-area-context": "^5.5.2",
+    "react-native-url-polyfill": "^4.0.0",
+    "react-native-video": "^6.19.3"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@babel/preset-env": "^7.25.3",
+    "@babel/runtime": "^7.25.0",
+    "@expo-google-fonts/noto-sans": "0.4.2",
+    "@expo-google-fonts/noto-sans-devanagari": "0.4.1",
+    "@react-native-community/cli": "20.2.0",
+    "@react-native-community/cli-platform-android": "20.2.0",
+    "@react-native/babel-preset": "0.88.1",
+    "@react-native/codegen": "0.88.1",
+    "@react-native/gradle-plugin": "0.88.1",
+    "@react-native/jest-preset": "0.88.1",
+    "@react-native/metro-config": "0.88.1",
+    "@react-native/typescript-config": "0.88.1",
+    "@types/jest": "^29.5.13",
+    "@types/markdown-it": "^14.1.2",
+    "@types/react": "^19.2.0",
+    "@types/react-test-renderer": "^19.1.0",
+    "@types/ws": "^8.18.2",
+    "fflate": "^0.8.2",
+    "jest": "^29.6.3",
+    "react-test-renderer": "19.3.0",
+    "typescript": "^5.7.0",
+    "ws": "^8.22.0"
+  },
+  "engines": {
+    "node": ">=22.11.0"
+  },
+  "codegenConfig": {
+    "name": "AzaadSpecs",
+    "type": "modules",
+    "jsSrcsDir": "src/native/specs",
+    "android": {
+      "javaPackageName": "org.azaadawaaz.app.specs"
+    }
+  }
+}

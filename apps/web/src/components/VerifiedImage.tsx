@@ -72,18 +72,30 @@ export function VerifiedImage(props: {
 const WIDTHS = ["480", "960", "1600"] as const;
 
 /** Pick the smallest variant at least as wide as needed (never wider than the original). */
-export function pickVariant(variants: ImageVariants | undefined, target: number, originalWidth?: number): string | undefined {
+export function pickVariant(
+  variants: ImageVariants | undefined,
+  target: number,
+  originalWidth?: number,
+): string | undefined {
   if (!variants) return undefined;
   for (const w of WIDTHS) {
     if (variants[w] && Number(w) >= target) return variants[w];
   }
   // Nothing wide enough: the original is best if we know it's wider, otherwise the largest variant.
   if (originalWidth && originalWidth > 1600) return undefined;
-  return [...WIDTHS].reverse().map((w) => variants[w]).find(Boolean);
+  return [...WIDTHS]
+    .reverse()
+    .map((w) => variants[w])
+    .find(Boolean);
 }
 
 /** Loader for a published image: a CID-verified variant, falling back to the SHA-256-verified original. */
-export function publishedImageLoader(item: { sha256?: string; cid: string; variants?: ImageVariants; width?: number }): ImageLoader {
+export function publishedImageLoader(item: {
+  sha256?: string;
+  cid: string;
+  variants?: ImageVariants;
+  width?: number;
+}): ImageLoader {
   return async (target) => {
     const variant = pickVariant(item.variants, target, item.width);
     if (variant) {

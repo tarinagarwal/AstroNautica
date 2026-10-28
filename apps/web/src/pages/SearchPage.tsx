@@ -10,7 +10,13 @@ export function searchStories(stories: StoryRef[], query: string): StoryRef[] {
   const terms = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
   if (!terms.length) return [];
   return stories.filter((s) => {
-    const hay = [s.title, s.event.tags.find((t) => t[0] === "title-hi")?.[1] ?? "", s.summary, s.event.content, ...s.tags]
+    const hay = [
+      s.title,
+      s.event.tags.find((t) => t[0] === "title-hi")?.[1] ?? "",
+      s.summary,
+      s.event.content,
+      ...s.tags,
+    ]
       .join("\n")
       .toLocaleLowerCase();
     return terms.every((t) => hay.includes(t));

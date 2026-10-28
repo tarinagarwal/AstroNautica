@@ -107,9 +107,19 @@ describe("NIP-98 authentication", () => {
     const header = createAuthHeader(PUBLIC_URL + "/queue", "GET", env.mod1.kp.secretKey);
     const e = JSON.parse(atob(header.slice(6)));
     e.pubkey = env.mod2.kp.pubkey;
-    expect((await mod.get("/queue", { header: `Nostr ${btoa(JSON.stringify(e))}` })).body.message).toBe("bad signature");
+    expect((await mod.get("/queue", { header: `Nostr ${btoa(JSON.stringify(e))}` })).body.message).toBe(
+      "bad signature",
+    );
     const wrongKind = finalizeEvent(
-      { kind: 1, created_at: Math.floor(Date.now() / 1000), tags: [["u", PUBLIC_URL + "/queue"], ["method", "GET"]], content: "" },
+      {
+        kind: 1,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [
+          ["u", PUBLIC_URL + "/queue"],
+          ["method", "GET"],
+        ],
+        content: "",
+      },
       env.mod1.kp.secretKey,
     );
     expect((await mod.get("/queue", { header: `Nostr ${btoa(JSON.stringify(wrongKind))}` })).body.message).toBe(
@@ -266,7 +276,10 @@ describe("HTTP hygiene", () => {
     });
     expect(txt.statusCode).toBe(415);
     const s = await submittedSubmission(env);
-    const big = await s.c.putRaw(`/submissions/${s.id}/media/${s.draft.media[0]!.sha256}/chunks/0`, new Uint8Array(1024 * 1024 + 18));
+    const big = await s.c.putRaw(
+      `/submissions/${s.id}/media/${s.draft.media[0]!.sha256}/chunks/0`,
+      new Uint8Array(1024 * 1024 + 18),
+    );
     expect(big.status).toBe(413);
     expect(big.body.error).toBe("payload_too_large");
     expect((await c.post("/submissions", { storyId: 1 })).body.error).toBe("invalid_body");

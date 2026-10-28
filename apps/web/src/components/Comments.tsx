@@ -32,7 +32,17 @@ export function Linkified({ text }: { text: string }) {
 
 type Post = (t: EventTemplate) => Promise<{ event: Event; createdKey: boolean; accepted: number }>;
 
-function CommentForm({ story, parent, post, onDone }: { story: StoryRef; parent?: Event; post: Post; onDone: (createdKey: boolean) => void }) {
+function CommentForm({
+  story,
+  parent,
+  post,
+  onDone,
+}: {
+  story: StoryRef;
+  parent?: Event;
+  post: Post;
+  onDone: (createdKey: boolean) => void;
+}) {
   const { t } = useI18n();
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -84,7 +94,19 @@ function CommentForm({ story, parent, post, onDone }: { story: StoryRef; parent?
   );
 }
 
-function CommentItem({ node, story, post, onPosted, depth }: { node: CommentNode; story: StoryRef; post: Post; onPosted: (k: boolean) => void; depth: number }) {
+function CommentItem({
+  node,
+  story,
+  post,
+  onPosted,
+  depth,
+}: {
+  node: CommentNode;
+  story: StoryRef;
+  post: Post;
+  onPosted: (k: boolean) => void;
+  depth: number;
+}) {
   const { t, date } = useI18n();
   const app = useApp();
   const { moderator } = useSession();
@@ -96,7 +118,13 @@ function CommentItem({ node, story, post, onPosted, depth }: { node: CommentNode
     if (!moderator?.signer.secretKey) return;
     const api = app.config.apiUrl ? new Api(app.config.apiUrl, moderator.signer) : null;
     const fn = what === "hide" ? hideComment : muteKey;
-    const r = await fn(app, api, moderator.signer.secretKey, moderator.signer.pubkey, what === "hide" ? e.id : e.pubkey);
+    const r = await fn(
+      app,
+      api,
+      moderator.signer.secretKey,
+      moderator.signer.pubkey,
+      what === "hide" ? e.id : e.pubkey,
+    );
     setModMsg(r.auditError ? t("moderate.auditFailed", { error: r.auditError }) : t("moderate.done"));
   };
   return (
@@ -150,7 +178,17 @@ function CommentItem({ node, story, post, onPosted, depth }: { node: CommentNode
   );
 }
 
-export function Comments({ story, events, loaded, post }: { story: StoryRef; events: Event[]; loaded: boolean; post: Post }) {
+export function Comments({
+  story,
+  events,
+  loaded,
+  post,
+}: {
+  story: StoryRef;
+  events: Event[];
+  loaded: boolean;
+  post: Post;
+}) {
   const { t } = useI18n();
   const app = useApp();
   const [backup, setBackup] = useState(false);

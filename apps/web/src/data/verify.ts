@@ -61,7 +61,8 @@ export async function verifyStory(
   };
 
   // 1. The announcing event: signed by a publisher key valid at the time.
-  const eventOk = verifyEventStrict(ref.event) && !!app.lists && wasPublisherAt(app.lists, ref.publisher, ref.createdAt);
+  const eventOk =
+    verifyEventStrict(ref.event) && !!app.lists && wasPublisherAt(app.lists, ref.publisher, ref.createdAt);
   update({ event: { state: eventOk ? "ok" : "fail" } });
 
   const tasks: Promise<void>[] = [];
@@ -70,7 +71,9 @@ export async function verifyStory(
   tasks.push(
     app
       .loadManifest(ref)
-      .then((m) => update({ manifest: { state: m.check.ok ? "ok" : "fail", sha256: ref.manifestSha256, check: m.check } }))
+      .then((m) =>
+        update({ manifest: { state: m.check.ok ? "ok" : "fail", sha256: ref.manifestSha256, check: m.check } }),
+      )
       .catch(() => update({ manifest: { state: "fail", sha256: ref.manifestSha256 } })),
   );
 
@@ -94,7 +97,9 @@ export async function verifyStory(
           4 * 1024 * 1024,
         );
         const ok = sha256Hex(bytes) === ref.manifestSha256;
-        update({ ipfs: { state: ok ? "ok" : "fail", cid: ref.manifestCid, gateway, error: ok ? undefined : "mismatch" } });
+        update({
+          ipfs: { state: ok ? "ok" : "fail", cid: ref.manifestCid, gateway, error: ok ? undefined : "mismatch" },
+        });
       } catch (e) {
         update({ ipfs: { state: "fail", cid: ref.manifestCid, error: e instanceof Error ? e.message : String(e) } });
       }

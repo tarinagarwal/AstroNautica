@@ -17,7 +17,9 @@ const b64 = (b: Uint8Array) => btoa(String.fromCharCode(...b));
 const unb64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
 async function deriveKey(passphrase: string, salt: Uint8Array, iterations: number): Promise<CryptoKey> {
-  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(passphrase), "PBKDF2", false, ["deriveKey"]);
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(passphrase), "PBKDF2", false, [
+    "deriveKey",
+  ]);
   return crypto.subtle.deriveKey(
     { name: "PBKDF2", hash: "SHA-256", salt: salt as BufferSource, iterations },
     base,
@@ -47,7 +49,11 @@ export class WrongPassphraseError extends Error {
 export async function unseal<T>(s: Sealed, passphrase: string): Promise<T> {
   const key = await deriveKey(passphrase, unb64(s.salt), s.iterations);
   try {
-    const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(s.iv) as BufferSource }, key, unb64(s.ct) as BufferSource);
+    const pt = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: unb64(s.iv) as BufferSource },
+      key,
+      unb64(s.ct) as BufferSource,
+    );
     return JSON.parse(new TextDecoder().decode(pt)) as T;
   } catch {
     throw new WrongPassphraseError();
@@ -61,7 +67,13 @@ export interface VaultRecord {
   sealed: Sealed;
 }
 
-export async function saveVault(name: VaultName, pubkey: string, secrets: unknown, passphrase: string, iterations?: number) {
+export async function saveVault(
+  name: VaultName,
+  pubkey: string,
+  secrets: unknown,
+  passphrase: string,
+  iterations?: number,
+) {
   await idbSet(`vault:${name}`, { pubkey, sealed: await seal(secrets, passphrase, iterations) } satisfies VaultRecord);
 }
 

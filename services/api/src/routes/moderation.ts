@@ -21,15 +21,7 @@ import {
   type SubmissionRow,
 } from "../stateMachine.js";
 import { activeClaim, loadSubmission, parseId } from "../submissions.js";
-import {
-  approveBody,
-  auditBody,
-  claimBody,
-  feedbackBody,
-  keysBody,
-  parse,
-  unlistBody,
-} from "../validation.js";
+import { approveBody, auditBody, claimBody, feedbackBody, keysBody, parse, unlistBody } from "../validation.js";
 
 type Params = { id: string };
 
@@ -244,7 +236,11 @@ export function moderationRoutes(app: FastifyInstance, ctx: Ctx): void {
       return { limited: false as const, unlisted: rows.rowCount ?? 0 };
     });
     if (result.limited)
-      throw new HttpError(429, "rate_limited", `at most ${ctx.config.unlistPerHour} unlistings per hour; the owner was alerted`);
+      throw new HttpError(
+        429,
+        "rate_limited",
+        `at most ${ctx.config.unlistPerHour} unlistings per hour; the owner was alerted`,
+      );
     ctx.forwarder.forward(audit);
     return reply.send({ storyId, unlisted: result.unlisted });
   });
@@ -253,8 +249,7 @@ export function moderationRoutes(app: FastifyInstance, ctx: Ctx): void {
     const pk = caller(req);
     const { auditEvent } = parse(auditBody, req.body);
     const action = (auditEvent as unknown as Event).tags?.find?.((t) => Array.isArray(t) && t[0] === "action")?.[1] as
-      | AuditAction
-      | undefined;
+      AuditAction | undefined;
     if (action !== "hide" && action !== "mute")
       throw badRequest("invalid_audit", 'this endpoint takes "hide" and "mute" audit events');
     const e = verifyAuditEvent(

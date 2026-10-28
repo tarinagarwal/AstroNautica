@@ -70,10 +70,17 @@ export function loadConfig(rawEnv: NodeJS.ProcessEnv = process.env, root = findR
     ownerPubkey: need(env.OWNER_PUBKEY ?? devConfig?.ownerPubkey, "OWNER_PUBKEY"),
     bootstrapRelays: list(env.RELAYS, devConfig?.relays ?? []),
     bootstrapListEvents:
-      env.BOOTSTRAP_LIST_EVENTS ?? (existsSync(resolve(root, ".dev/list-events.json")) ? resolve(root, ".dev/list-events.json") : undefined),
+      env.BOOTSTRAP_LIST_EVENTS ??
+      (existsSync(resolve(root, ".dev/list-events.json")) ? resolve(root, ".dev/list-events.json") : undefined),
     publisherSecretKey: parseSecretKey(need(nsec, "PUBLISHER_NSEC")),
-    publisherX25519Private: need(env.PUBLISHER_X25519_PRIVATE ?? devKeys?.publisher?.x25519Private, "PUBLISHER_X25519_PRIVATE"),
-    publisherEvmKey: need(env.PUBLISHER_EVM_KEY ?? devKeys?.publisher?.evmPrivateKey, "PUBLISHER_EVM_KEY") as `0x${string}`,
+    publisherX25519Private: need(
+      env.PUBLISHER_X25519_PRIVATE ?? devKeys?.publisher?.x25519Private,
+      "PUBLISHER_X25519_PRIVATE",
+    ),
+    publisherEvmKey: need(
+      env.PUBLISHER_EVM_KEY ?? devKeys?.publisher?.evmPrivateKey,
+      "PUBLISHER_EVM_KEY",
+    ) as `0x${string}`,
     ipfsApis: list(env.IPFS_APIS, devConfig?.ipfsApis ?? []),
     ipfsGateways: list(env.IPFS_GATEWAYS, devConfig?.ipfsGateways ?? []),
     pinningServices: env.PINNING_SERVICES ? JSON.parse(env.PINNING_SERVICES) : (devConfig?.pinningServices ?? []),
@@ -88,15 +95,25 @@ export function loadConfig(rawEnv: NodeJS.ProcessEnv = process.env, root = findR
   };
 }
 
+/** Variables that may instead be given as Docker secrets via `<NAME>_FILE`. */
+export const SECRET_VARS = [
+  "DATABASE_URL",
+  "DATABASE_PASSWORD",
+  "PUBLISHER_NSEC",
+  "PUBLISHER_X25519_PRIVATE",
+  "PUBLISHER_EVM_KEY",
+  "PINNING_SERVICES",
+] as const;
+
 /**
- * Docker secrets: for any variable `X`, `X_FILE` names a file holding its value (trailing newline trimmed).
- * `X` itself wins if both are set.
+ * Docker secrets: for each name in `SECRET_VARS`, `<NAME>_FILE` names a file holding its value (trailing newline
+ * trimmed). `<NAME>` itself wins if both are set.
  */
 export function withFileSecrets(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const out: NodeJS.ProcessEnv = { ...env };
-  for (const [k, v] of Object.entries(env)) {
-    if (!k.endsWith("_FILE") || !v) continue;
-    const name = k.slice(0, -5);
+  for (const name of SECRET_VARS) {
+    const v = env[`${name}_FILE`];
+    if (!v) continue;
     if (out[name] === undefined) out[name] = readFileSync(v, "utf8").replace(/\r?\n$/, "");
   }
   if (out.DATABASE_URL === undefined && out.DATABASE_HOST) {

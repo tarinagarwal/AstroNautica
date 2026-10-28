@@ -39,16 +39,86 @@ export function App({ app, autoRefresh = true }: { app: AppData; autoRefresh?: b
             <Layout>
               <Routes>
                 <Route path="/" element={<Home />} />
-                <Route path="/story/:id" element={<L><StoryPage /></L>} />
-                <Route path="/story/:id/version/:sha" element={<L><VersionPage /></L>} />
-                <Route path="/tag/:tag" element={<L><TagPage /></L>} />
-                <Route path="/search" element={<L><SearchPage /></L>} />
-                <Route path="/about" element={<L><AboutPage /></L>} />
-                <Route path="/reach" element={<L><ReachPage /></L>} />
-                <Route path="/key" element={<L><KeyPage /></L>} />
-                <Route path="/invite/:code" element={<L><InvitePage /></L>} />
-                <Route path="/contribute/*" element={<L><ContributorArea /></L>} />
-                <Route path="/moderate/*" element={<L><ModeratorArea /></L>} />
+                <Route
+                  path="/story/:id"
+                  element={
+                    <L>
+                      <StoryPage />
+                    </L>
+                  }
+                />
+                <Route
+                  path="/story/:id/version/:sha"
+                  element={
+                    <L>
+                      <VersionPage />
+                    </L>
+                  }
+                />
+                <Route
+                  path="/tag/:tag"
+                  element={
+                    <L>
+                      <TagPage />
+                    </L>
+                  }
+                />
+                <Route
+                  path="/search"
+                  element={
+                    <L>
+                      <SearchPage />
+                    </L>
+                  }
+                />
+                <Route
+                  path="/about"
+                  element={
+                    <L>
+                      <AboutPage />
+                    </L>
+                  }
+                />
+                <Route
+                  path="/reach"
+                  element={
+                    <L>
+                      <ReachPage />
+                    </L>
+                  }
+                />
+                <Route
+                  path="/key"
+                  element={
+                    <L>
+                      <KeyPage />
+                    </L>
+                  }
+                />
+                <Route
+                  path="/invite/:code"
+                  element={
+                    <L>
+                      <InvitePage />
+                    </L>
+                  }
+                />
+                <Route
+                  path="/contribute/*"
+                  element={
+                    <L>
+                      <ContributorArea />
+                    </L>
+                  }
+                />
+                <Route
+                  path="/moderate/*"
+                  element={
+                    <L>
+                      <ModeratorArea />
+                    </L>
+                  }
+                />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Layout>

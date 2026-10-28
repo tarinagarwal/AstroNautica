@@ -23,7 +23,8 @@ describe("pinning service client (IPFS Pinning Service API)", () => {
           res.statusCode = 202;
           return res.end(JSON.stringify({ requestid: "r1", status: "queued", pin: {} }));
         }
-        if (req.method === "GET" && req.url === "/v1/pins/r1") return res.end(JSON.stringify({ requestid: "r1", status: "pinned" }));
+        if (req.method === "GET" && req.url === "/v1/pins/r1")
+          return res.end(JSON.stringify({ requestid: "r1", status: "pinned" }));
         res.statusCode = 404;
         res.end("{}");
       });
@@ -51,7 +52,12 @@ describe("video torrents", () => {
       { path: "hls/master.m3u8", content: new TextEncoder().encode("#EXTM3U\n") },
     ];
     const webSeeds = ["https://gw.example/ipfs/bafydir/"];
-    const a = await createVideoTorrent({ name: "story-x", files, webSeeds, seedDir: mkdtempSync(join(tmpdir(), "seed-")) });
+    const a = await createVideoTorrent({
+      name: "story-x",
+      files,
+      webSeeds,
+      seedDir: mkdtempSync(join(tmpdir(), "seed-")),
+    });
     const seedDir = mkdtempSync(join(tmpdir(), "seed-"));
     const b = await createVideoTorrent({ name: "story-x", files, webSeeds, seedDir });
     expect(a.infoHash).toMatch(/^[0-9a-f]{40}$/);

@@ -8,8 +8,8 @@ import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import { storyIdToBytes16 } from "@azaadawaaz/schema";
 import type { ChainConfig } from "../config.js";
 
-type AbiParam = { type: string };
-type AbiItem = { type: string; name?: string; inputs?: AbiParam[] };
+type AbiParam = { readonly type: string };
+type AbiItem = { readonly type: string; readonly name?: string; readonly inputs?: readonly AbiParam[] };
 
 function signature(kind: "function" | "event", name: string): string {
   const item = (registryAbi as readonly AbiItem[]).find((i) => i.type === kind && i.name === name);
@@ -146,7 +146,12 @@ export async function checkChainReceipt(
 ): Promise<ChainReceipt> {
   let result: string;
   try {
-    result = await rpc<string>(rpcUrls(c), "eth_call", [{ to: c.registry, data: encodeReceiptCall(storyId, version) }, "latest"], f);
+    result = await rpc<string>(
+      rpcUrls(c),
+      "eth_call",
+      [{ to: c.registry, data: encodeReceiptCall(storyId, version) }, "latest"],
+      f,
+    );
   } catch {
     return { chain: c, ok: false, error: "unreachable" };
   }
@@ -162,7 +167,12 @@ export async function checkChainReceipt(
       out.txHash = found.log.transactionHash;
       out.blockNumber = parseInt(found.log.blockNumber, 16);
       out.manifestCid = found.decoded.cid;
-      const block = await rpc<{ timestamp: string }>(rpcUrls(c), "eth_getBlockByNumber", [found.log.blockNumber, false], f);
+      const block = await rpc<{ timestamp: string }>(
+        rpcUrls(c),
+        "eth_getBlockByNumber",
+        [found.log.blockNumber, false],
+        f,
+      );
       out.timestamp = parseInt(block.timestamp, 16);
     }
   } catch {

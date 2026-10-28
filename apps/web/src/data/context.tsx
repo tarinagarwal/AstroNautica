@@ -3,7 +3,15 @@ import type { AppData } from "./appData.js";
 
 const Ctx = createContext<AppData | null>(null);
 
-export function DataProvider({ app, children, autoRefresh = true }: { app: AppData; children: ReactNode; autoRefresh?: boolean }) {
+export function DataProvider({
+  app,
+  children,
+  autoRefresh = true,
+}: {
+  app: AppData;
+  children: ReactNode;
+  autoRefresh?: boolean;
+}) {
   useEffect(() => {
     let stop = false;
     void app.init().then(() => {

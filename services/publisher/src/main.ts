@@ -15,7 +15,8 @@ const log = (msg: string, extra: Record<string, unknown> = {}) =>
 async function main() {
   const config = loadConfig();
   if (process.env.NODE_ENV === "production") {
-    if (config.pinningServices.length === 0) throw new Error("production requires at least one pinning service (spec §6 step 3)");
+    if (config.pinningServices.length === 0)
+      throw new Error("production requires at least one pinning service (spec §6 step 3)");
     if (config.ipfsApis.length < 2) throw new Error("production requires at least two IPFS nodes (spec §6 step 3)");
     if (config.arweaveDevMine) throw new Error("ARWEAVE_DEV_MINE must be off in production");
   }
@@ -27,7 +28,12 @@ async function main() {
   const ipfs = new IpfsCluster(config.ipfsApis);
   const arweave = new ArweaveStore(config.arweaveUrl, config.arweaveJwkPath, config.arweaveDevMine);
   const address = await arweave.init();
-  log("publisher starting", { workerId: config.workerId, ipfsNodes: ipfs.size, chains: config.chains.map((c) => c.key), arweave: address });
+  log("publisher starting", {
+    workerId: config.workerId,
+    ipfsNodes: ipfs.size,
+    chains: config.chains.map((c) => c.key),
+    arweave: address,
+  });
 
   const pipeline = new Pipeline({ config, db, relays, ipfs, arweave, log });
   const worker = new Worker(db, pipeline, { workerId: config.workerId, pollMs: config.pollMs, log });

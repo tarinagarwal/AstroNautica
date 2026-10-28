@@ -1,5 +1,6 @@
 import type { Event, PublishResult } from "@azaadawaaz/core";
 import type { AuditForwarder } from "./audit.js";
+import { scrubAddresses } from "./privacy.js";
 
 export interface RelayPublisher {
   publish(relays: string[], event: Event): Promise<PublishResult[]>;
@@ -21,10 +22,12 @@ export class RelayAuditForwarder implements AuditForwarder {
     const p = this.pool
       .publish(relays, event)
       .then((results) => {
-        const failed = results.filter((r) => !r.ok).map((r) => r.relay);
+        const failed = results.filter((r) => !r.ok).map((r) => scrubAddresses(r.relay));
         if (failed.length) this.log.warn({ eventId: event.id, failed }, "audit event not accepted by every relay");
       })
-      .catch((e: unknown) => this.log.warn({ err: e instanceof Error ? e.message : String(e) }, "audit forward failed"))
+      .catch((e: unknown) =>
+        this.log.warn({ err: scrubAddresses(e instanceof Error ? e.message : String(e)) }, "audit forward failed"),
+      )
       .finally(() => this.pending.delete(p));
     this.pending.add(p);
   }

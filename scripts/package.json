@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@azaadawaaz/core": "workspace:*",
+    "@azaadawaaz/media-strip": "workspace:*",
     "@azaadawaaz/schema": "workspace:*",
     "@ipld/car": "^5.4.7",
     "@ipld/dag-pb": "^4.2.0",

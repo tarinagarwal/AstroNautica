@@ -23,7 +23,8 @@ export class Worker {
       const attempts = job.attempts + 1;
       const next = await this.db.failJob(job.submission_id, attempts);
       this.opts.log("job failed; will retry", { submission: job.submission_id, attempts, next, error: String(e) });
-      if (attempts === 5) await this.db.alertOwner("publish_failed", { submission: job.submission_id, error: String(e) });
+      if (attempts === 5)
+        await this.db.alertOwner("publish_failed", { submission: job.submission_id, error: String(e) });
     }
     return true;
   }

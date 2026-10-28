@@ -19,7 +19,9 @@ export async function runMigrations(pool: Pool, dir: string = MIGRATIONS_DIR): P
     await client.query(
       "CREATE TABLE IF NOT EXISTS schema_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())",
     );
-    const done = new Set((await client.query<{ name: string }>("SELECT name FROM schema_migrations")).rows.map((r) => r.name));
+    const done = new Set(
+      (await client.query<{ name: string }>("SELECT name FROM schema_migrations")).rows.map((r) => r.name),
+    );
     for (const f of files) {
       if (done.has(f)) continue;
       const sql = await readFile(join(dir, f), "utf8");

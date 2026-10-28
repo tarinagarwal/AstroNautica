@@ -21,7 +21,15 @@ export function Markdown({ text, lang }: { text: string; lang?: Lang }) {
   return <div className="md" lang={lang} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-function ImageGallery({ items, lang, preview }: { items: (ImageItem | { sha256: string; caption?: ImageItem["caption"] })[]; lang: Lang; preview?: PreviewMedia }) {
+function ImageGallery({
+  items,
+  lang,
+  preview,
+}: {
+  items: (ImageItem | { sha256: string; caption?: ImageItem["caption"] })[];
+  lang: Lang;
+  preview?: PreviewMedia;
+}) {
   const t = useT();
   return (
     <div className={items.length > 1 ? "gallery" : "single-image"} data-testid="image-block">
@@ -67,7 +75,15 @@ function GalleryItem({
   );
 }
 
-function PreviewVideo({ block, lang, preview }: { block: { source: { sha256: string } }; lang: Lang; preview: PreviewMedia }) {
+function PreviewVideo({
+  block,
+  lang,
+  preview,
+}: {
+  block: { source: { sha256: string } };
+  lang: Lang;
+  preview: PreviewMedia;
+}) {
   const t = useT();
   const [url, setUrl] = useState<string>();
   const [err, setErr] = useState(false);
@@ -83,7 +99,11 @@ function PreviewVideo({ block, lang, preview }: { block: { source: { sha256: str
   }, [block.source.sha256, preview]);
   return (
     <figure className="video" data-testid="video-block" lang={lang}>
-      {url ? <video src={url} controls playsInline /> : <p className="muted">{err ? t("media.unavailable") : t("preview.decrypting")}</p>}
+      {url ? (
+        <video src={url} controls playsInline />
+      ) : (
+        <p className="muted">{err ? t("media.unavailable") : t("preview.decrypting")}</p>
+      )}
     </figure>
   );
 }
@@ -147,7 +167,15 @@ function BlockView({ block, lang, preview }: { block: Block | ApprovalBlock; lan
 }
 
 /** Renders a published manifest or (with `preview`) a decrypted approval body. */
-export function StoryBody({ story, lang, preview }: { story: Manifest | ApprovalBody; lang: Lang; preview?: PreviewMedia }) {
+export function StoryBody({
+  story,
+  lang,
+  preview,
+}: {
+  story: Manifest | ApprovalBody;
+  lang: Lang;
+  preview?: PreviewMedia;
+}) {
   return (
     <div className="story-body" lang={lang}>
       {story.blocks.map((b, i) => (
@@ -157,7 +185,15 @@ export function StoryBody({ story, lang, preview }: { story: Manifest | Approval
   );
 }
 
-export function StoryHeader({ story, lang, publishedAt }: { story: Manifest | ApprovalBody; lang: Lang; publishedAt?: string }) {
+export function StoryHeader({
+  story,
+  lang,
+  publishedAt,
+}: {
+  story: Manifest | ApprovalBody;
+  lang: Lang;
+  publishedAt?: string;
+}) {
   const { t, date } = useI18n();
   const location = pickText(story.location, lang);
   const cover = "cid" in (story.cover ?? {}) ? (story as Manifest).cover : undefined;
@@ -172,7 +208,14 @@ export function StoryHeader({ story, lang, publishedAt }: { story: Manifest | Ap
         {location && <> · {location}</>}
       </p>
       {cover && coverLoad && (
-        <VerifiedImage load={coverLoad} width={cover.width} height={cover.height} blurhash={cover.blurhash} alt="" className="cover" />
+        <VerifiedImage
+          load={coverLoad}
+          width={cover.width}
+          height={cover.height}
+          blurhash={cover.blurhash}
+          alt=""
+          className="cover"
+        />
       )}
     </header>
   );

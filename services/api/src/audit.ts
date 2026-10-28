@@ -38,7 +38,8 @@ const HEX64 = /^[0-9a-f]{64}$/;
 /** Validate an audit event against what the request is doing. Throws 400 with a precise reason. */
 export function verifyAuditEvent(raw: unknown, x: AuditExpectation, nowSec = Math.floor(Date.now() / 1000)): Event {
   const e = raw as Event;
-  if (typeof e !== "object" || e === null || Array.isArray(e)) throw badRequest("invalid_audit", "auditEvent is required");
+  if (typeof e !== "object" || e === null || Array.isArray(e))
+    throw badRequest("invalid_audit", "auditEvent is required");
   if (!verifyEventStrict(e)) throw badRequest("invalid_audit", "audit event signature or id is invalid");
   if (e.kind !== KIND_AUDIT) throw badRequest("invalid_audit", `audit event must be kind ${KIND_AUDIT}`);
   if (e.pubkey !== x.actor) throw badRequest("invalid_audit", "audit event must be signed by the caller");

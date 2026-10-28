@@ -68,7 +68,12 @@ export async function nip07Signer(): Promise<Signer> {
         ["method", method.toUpperCase()],
       ];
       if (body !== undefined && body.length > 0) tags.push(["payload", sha256Hex(body)]);
-      const e = await ext.signEvent({ kind: KIND_HTTP_AUTH, created_at: Math.floor(Date.now() / 1000), tags, content: "" });
+      const e = await ext.signEvent({
+        kind: KIND_HTTP_AUTH,
+        created_at: Math.floor(Date.now() / 1000),
+        tags,
+        content: "",
+      });
       return `Nostr ${btoa(JSON.stringify(e))}`;
     },
   };

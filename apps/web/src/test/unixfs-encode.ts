@@ -91,7 +91,9 @@ export function encodeDirectory(entries: Record<string, Uint8Array | Record<stri
     .sort()
     .map((name) => {
       const v = entries[name]!;
-      const enc = v instanceof Uint8Array ? encodeFile(v) : encodeDirectory(v as Record<string, Uint8Array>);
+      const enc = ArrayBuffer.isView(v)
+        ? encodeFile(v as Uint8Array)
+        : encodeDirectory(v as Record<string, Uint8Array>);
       return { name, enc };
     });
   const links = children.map(({ name, enc }) => ({

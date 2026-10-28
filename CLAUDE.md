@@ -27,3 +27,8 @@ pnpm monorepo (Node 22, TypeScript strict ESM, Vitest). `packages/*` (schema, co
 - Media is stripped on the device (`packages/media-strip`) and re-checked on the server.
 - Owner key is offline; daily moderation uses moderator-signed lists (decision D5).
 - Commit only to branch `ccr-2fc6e99f-vk51vj`.
+
+## End-to-end test
+`docker compose -f infra/dev/docker-compose.yml up -d --wait && node scripts/dev-setup.mjs && pnpm -r build && node scripts/e2e.mjs`
+— starts the API and publisher itself and runs 62 checks across every acceptance criterion it can cover locally.
+API tests use the dev Postgres database `azaadawaaz_test` (override with `TEST_DATABASE_URL`).

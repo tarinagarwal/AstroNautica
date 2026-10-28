@@ -56,8 +56,7 @@ export function checkWrappedKeys(ctx: Ctx, wrapped: Record<string, string>): voi
   if (!ctx.lists.ready() || !ctx.lists.ownerX25519())
     throw new HttpError(503, "lists_unavailable", "the signed moderator and service-key lists are not loaded yet");
   const missing = ctx.lists.requiredRecipients().filter((k) => !(k in wrapped));
-  if (missing.length)
-    throw badRequest("missing_wrapped_keys", `content key is not wrapped for: ${missing.join(", ")}`);
+  if (missing.length) throw badRequest("missing_wrapped_keys", `content key is not wrapped for: ${missing.join(", ")}`);
   const publisherKeys = ctx.lists.publisherX25519Keys();
   if (Object.keys(wrapped).some((k) => publisherKeys.has(k)))
     throw badRequest("publisher_wrap_forbidden", "the publisher may only receive the content key with an approval");

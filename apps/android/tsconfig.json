@@ -1,0 +1,10 @@
+{
+  "extends": "@react-native/typescript-config",
+  "compilerOptions": {
+    "noUncheckedIndexedAccess": true,
+    "types": ["jest", "node"],
+    "lib": ["es2023", "dom"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "index.d.ts"],
+  "exclude": ["**/node_modules", "android", "build"]
+}

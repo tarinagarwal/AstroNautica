@@ -209,7 +209,7 @@ export class Api {
     }
     if (opts.binary) return new Uint8Array(await res.arrayBuffer()) as T;
     const text = await res.text();
-    return (text ? camel<T>(JSON.parse(text)) : (undefined as T));
+    return text ? camel<T>(JSON.parse(text)) : (undefined as T);
   }
 
   // ---- public ----

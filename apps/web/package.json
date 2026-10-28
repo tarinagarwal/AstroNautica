@@ -24,6 +24,7 @@
     "@azaadawaaz/schema": "workspace:*",
     "@fontsource/noto-sans": "^5.2.0",
     "@fontsource/noto-sans-devanagari": "^5.2.0",
+    "@noble/curves": "^2.0.0",
     "@noble/hashes": "^2.0.0",
     "blurhash": "^2.0.5",
     "hls.js": "^1.6.19",

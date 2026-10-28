@@ -40,7 +40,11 @@ export function VerifyPanel({ story }: { story: StoryRef }) {
   return (
     <section className="verify" aria-labelledby="verify-h" data-testid="verify-panel">
       <h2 id="verify-h">{t("verify.title")}</h2>
-      <p className={"verdict " + (r.allOk ? "ok" : failed ? "fail" : "pending")} data-testid="verify-verdict" role="status">
+      <p
+        className={"verdict " + (r.allOk ? "ok" : failed ? "fail" : "pending")}
+        data-testid="verify-verdict"
+        role="status"
+      >
         {r.allOk ? `✓ ${t("verify.ok")}` : failed ? `✗ ${t("verify.failed")}` : t("verify.checking")}
       </p>
       <dl className="checks">
@@ -80,11 +84,13 @@ export function VerifyPanel({ story }: { story: StoryRef }) {
           {r.ipfs.gateway && <span className="muted small"> {t("verify.servedBy", { source: r.ipfs.gateway })}</span>}
           {r.ipfs.state === "fail" && <span className="error small"> {t("verify.ipfsFailed")}</span>}
           <span className="links">
-            {gatewayLinks(r.ipfs.cid).slice(0, 3).map((u) => (
-              <a key={u} href={u} target="_blank" rel="noopener noreferrer">
-                {new URL(u).host}
-              </a>
-            ))}
+            {gatewayLinks(r.ipfs.cid)
+              .slice(0, 3)
+              .map((u) => (
+                <a key={u} href={u} target="_blank" rel="noopener noreferrer">
+                  {new URL(u).host}
+                </a>
+              ))}
           </span>
         </dd>
 
@@ -98,11 +104,13 @@ export function VerifyPanel({ story }: { story: StoryRef }) {
           {r.arweave.error === "unreachable" && <span className="error small">{t("verify.arweaveFailed")}</span>}
           {r.arweave.tx && (
             <span className="links">
-              {arweaveLinks(r.arweave.tx).slice(0, 2).map((u) => (
-                <a key={u} href={u} target="_blank" rel="noopener noreferrer">
-                  {new URL(u).host}
-                </a>
-              ))}
+              {arweaveLinks(r.arweave.tx)
+                .slice(0, 2)
+                .map((u) => (
+                  <a key={u} href={u} target="_blank" rel="noopener noreferrer">
+                    {new URL(u).host}
+                  </a>
+                ))}
             </span>
           )}
         </dd>

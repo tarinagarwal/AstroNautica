@@ -15,14 +15,28 @@ import { Comments } from "../components/Comments.js";
 import { useSession } from "../data/session.js";
 import { ModeratorStoryTools } from "../components/ModeratorStoryTools.js";
 
-export function StoryLangSwitch({ langs, value, onChange }: { langs: Lang[]; value: Lang; onChange: (l: Lang) => void }) {
+export function StoryLangSwitch({
+  langs,
+  value,
+  onChange,
+}: {
+  langs: Lang[];
+  value: Lang;
+  onChange: (l: Lang) => void;
+}) {
   const { t } = useI18n();
   if (langs.length < 2) return null;
   return (
     <div className="lang-switch story-lang" role="group" aria-label={t("story.readIn")} data-testid="story-lang">
       <span className="muted small">{t("story.readIn")}</span>
       {langs.map((l) => (
-        <button key={l} type="button" className={l === value ? "on" : ""} aria-pressed={l === value} onClick={() => onChange(l)}>
+        <button
+          key={l}
+          type="button"
+          className={l === value ? "on" : ""}
+          aria-pressed={l === value}
+          onClick={() => onChange(l)}
+        >
           {t(`lang.${l}`)}
         </button>
       ))}
@@ -84,7 +98,13 @@ function Loaded({ story }: { story: StoryRef }) {
       )}
       <div className="actions">
         <ShareButton title={title} />
-        <button type="button" className={showVerify ? "on" : ""} aria-expanded={showVerify} onClick={() => setShowVerify((x) => !x)} data-testid="verify-button">
+        <button
+          type="button"
+          className={showVerify ? "on" : ""}
+          aria-expanded={showVerify}
+          onClick={() => setShowVerify((x) => !x)}
+          data-testid="verify-button"
+        >
           {t("verify.button")}
         </button>
       </div>
@@ -129,8 +149,14 @@ export default function StoryPage() {
 
   if (app.listsStatus === "none") return <p className="pad">{t("banner.noLists")}</p>;
   if (found === undefined) return <p className="muted pad">{t("story.loading")}</p>;
-  if (found === null) return <p className="pad" data-testid="story-not-found">{t("story.notFound")}</p>;
-  if (found.unlisted) {
+  if (found === null)
+    return (
+      <p className="pad" data-testid="story-not-found">
+        {t("story.notFound")}
+      </p>
+    );
+  // Checked on every render: the unlisted list can arrive from relays after the story itself.
+  if (found.unlisted || app.lists?.unlisted.has(id)) {
     return (
       <div className="page">
         <p className="banner warn" role="status" data-testid="story-unlisted">

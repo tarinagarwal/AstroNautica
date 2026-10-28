@@ -27,5 +27,9 @@
     "@types/pg": "^8.15.0",
     "@types/ws": "^8.18.2",
     "tsx": "^4.20.0"
-  }
+  },
+  "files": [
+    "dist",
+    "migrations"
+  ]
 }

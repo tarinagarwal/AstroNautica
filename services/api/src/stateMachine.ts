@@ -159,12 +159,17 @@ export interface FeedbackEntry {
 export async function transition(db: Queryable, action: Action, opts: TransitionOptions): Promise<SubmissionRow> {
   const t: Transition = TRANSITIONS[action];
   const params: unknown[] = [opts.id, t.from];
-  const assignments = [t.to ? `state = $${params.push(t.to)}::submission_state` : "state = state", "updated_at = now()"];
+  const assignments = [
+    t.to ? `state = $${params.push(t.to)}::submission_state` : "state = state",
+    "updated_at = now()",
+  ];
   for (const [col, value] of Object.entries(opts.sets ?? {})) {
     if (!SETTABLE.has(col)) throw new Error(`transition cannot set column ${col}`);
     if (value instanceof Sql) assignments.push(`${col} = ${value.text}`);
     else if (col === "feedback" && isAppend(value))
-      assignments.push(`feedback = coalesce(feedback, '[]'::jsonb) || jsonb_build_array($${params.push(JSON.stringify(value.entry))}::jsonb)`);
+      assignments.push(
+        `feedback = coalesce(feedback, '[]'::jsonb) || jsonb_build_array($${params.push(JSON.stringify(value.entry))}::jsonb)`,
+      );
     else if (col === "wrapped_keys" || col === "media" || col === "approval")
       assignments.push(`${col} = $${params.push(value === null ? null : JSON.stringify(value))}::jsonb`);
     else assignments.push(`${col} = $${params.push(value)}`);

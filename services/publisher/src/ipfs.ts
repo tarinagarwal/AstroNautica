@@ -26,12 +26,18 @@ export class IpfsCluster {
    * Add a file to every node. All nodes must agree on the CID. Succeeds if at least `minNodes` nodes stored it
    * (spec: at least two of our own nodes); failures are reported.
    */
-  async addFile(content: Uint8Array, minNodes = Math.min(2, this.clients.length)): Promise<{ cid: string; nodes: string[] }> {
+  async addFile(
+    content: Uint8Array,
+    minNodes = Math.min(2, this.clients.length),
+  ): Promise<{ cid: string; nodes: string[] }> {
     return this.onAll(minNodes, async (c) => (await c.add(content, ADD_OPTS)).cid.toString());
   }
 
   /** Add a directory (e.g. an HLS folder) to every node and return the directory CID. */
-  async addDirectory(entries: DirEntry[], minNodes = Math.min(2, this.clients.length)): Promise<{ cid: string; nodes: string[] }> {
+  async addDirectory(
+    entries: DirEntry[],
+    minNodes = Math.min(2, this.clients.length),
+  ): Promise<{ cid: string; nodes: string[] }> {
     return this.onAll(minNodes, async (c) => {
       let root: string | undefined;
       for await (const r of c.addAll(
@@ -71,14 +77,21 @@ export class IpfsCluster {
     throw new Error(`could not read ${path} from any IPFS node: ${String(lastErr)}`);
   }
 
-  private async onAll(minNodes: number, fn: (c: KuboRPCClient) => Promise<string>): Promise<{ cid: string; nodes: string[] }> {
-    const results = await Promise.allSettled(this.clients.map(async ({ url, client }) => ({ url, cid: await fn(client) })));
+  private async onAll(
+    minNodes: number,
+    fn: (c: KuboRPCClient) => Promise<string>,
+  ): Promise<{ cid: string; nodes: string[] }> {
+    const results = await Promise.allSettled(
+      this.clients.map(async ({ url, client }) => ({ url, cid: await fn(client) })),
+    );
     const ok = results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
     const cids = new Set(ok.map((r) => r.cid));
     if (cids.size > 1) throw new Error(`IPFS nodes disagree on the CID: ${[...cids].join(", ")}`);
     if (ok.length < minNodes) {
       const errs = results.flatMap((r) => (r.status === "rejected" ? [String(r.reason)] : []));
-      throw new Error(`only ${ok.length}/${this.clients.length} IPFS nodes stored the file (need ${minNodes}): ${errs.join("; ")}`);
+      throw new Error(
+        `only ${ok.length}/${this.clients.length} IPFS nodes stored the file (need ${minNodes}): ${errs.join("; ")}`,
+      );
     }
     return { cid: ok[0]!.cid, nodes: ok.map((r) => r.url) };
   }
@@ -142,7 +155,9 @@ export async function nodeOrigins(apiUrls: string[]): Promise<string[]> {
   for (const url of apiUrls) {
     try {
       const id = await create({ url }).id();
-      out.push(...id.addresses.map((a) => a.toString()).filter((a) => !a.includes("/127.0.0.1/") && !a.includes("/::1/")));
+      out.push(
+        ...id.addresses.map((a) => a.toString()).filter((a) => !a.includes("/127.0.0.1/") && !a.includes("/::1/")),
+      );
     } catch {
       // a node being down only means fewer origins
     }

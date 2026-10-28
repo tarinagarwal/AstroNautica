@@ -38,7 +38,8 @@ async function main() {
     app.log.info({ accepted: n }, "loaded bootstrap list events");
   }
   await lists.start();
-  if (!lists.ready()) app.log.warn({}, "owner-signed moderator/service-key lists not found yet; retrying every refresh");
+  if (!lists.ready())
+    app.log.warn({}, "owner-signed moderator/service-key lists not found yet; retrying every refresh");
 
   const staging = new StagingStore(config.stagingDir);
   const cleanup = async () => {
@@ -53,7 +54,8 @@ async function main() {
   cleanupTimer.unref();
   void cleanup();
 
-  await app.listen({ port: config.port, host: config.host });
+  // The default "listening at http://<address>" line would put an address in the log.
+  await app.listen({ port: config.port, host: config.host, listenTextResolver: () => "server listening" });
 
   let closing = false;
   const shutdown = async () => {

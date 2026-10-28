@@ -7,10 +7,20 @@ export function LangSwitch() {
   const { lang, setLang, t } = useI18n();
   return (
     <div className="lang-switch" role="group" aria-label={t("lang.switch")}>
-      <button type="button" className={lang === "en" ? "on" : ""} aria-pressed={lang === "en"} onClick={() => setLang("en")}>
+      <button
+        type="button"
+        className={lang === "en" ? "on" : ""}
+        aria-pressed={lang === "en"}
+        onClick={() => setLang("en")}
+      >
         {t("lang.en")}
       </button>
-      <button type="button" className={lang === "hi" ? "on" : ""} aria-pressed={lang === "hi"} onClick={() => setLang("hi")}>
+      <button
+        type="button"
+        className={lang === "hi" ? "on" : ""}
+        aria-pressed={lang === "hi"}
+        onClick={() => setLang("hi")}
+      >
         {t("lang.hi")}
       </button>
     </div>
@@ -24,8 +34,7 @@ function Banners() {
     <>
       {app.listsStatus === "none" && (
         <div className="banner warn" role="status" data-testid="no-lists">
-          <strong>{t("banner.noLists")}</strong> {t("banner.noListsHelp")}{" "}
-          <Link to="/reach">{t("nav.reach")}</Link>
+          <strong>{t("banner.noLists")}</strong> {t("banner.noListsHelp")} <Link to="/reach">{t("nav.reach")}</Link>
         </div>
       )}
       {app.offline && app.listsStatus !== "none" && (
