@@ -19,7 +19,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { toPubkeyHex } from "@azaadawaaz/core";
-import { rebuildArchive } from "@azaadawaaz/scripts/archive";
+import { fetchVerifiedCar, importCarInto, pinCid, rebuildArchive } from "@azaadawaaz/scripts/archive";
 
 const env = process.env;
 const list = (v) =>
@@ -84,7 +84,11 @@ async function syncWeb(lists) {
   const target = join(cfg.webRoot, web.cid);
   const current = join(cfg.webRoot, "current");
   if (!existsSync(target)) {
-    await kubo(`pin/add?arg=${web.cid}&recursive=true`);
+    // Get the release as a verified CAR from the gateways (every block hash-checked, DAG complete), import it into
+    // the local node and pin it. This does not depend on the local node finding peers.
+    const { blocks } = await fetchVerifiedCar(web.cid, cfg.gateways);
+    await importCarInto(blocks, cfg.ipfsApi);
+    await pinCid(web.cid, cfg.ipfsApi);
     const tmp = `${target}.tmp`;
     rmSync(tmp, { recursive: true, force: true });
     await exportDir(web.cid, tmp);

@@ -29,6 +29,135 @@ import {
 import { bytes16ToStoryId, hexEquals, manifestSha256, sha256Hex, validateManifest } from "@azaadawaaz/schema";
 
 /**
+ * Fetch a CAR for `cid` from trustless gateways, verify every block against its hash and check the DAG is complete.
+ * Returns the root CID and blocks (root block first).
+ */
+export async function fetchVerifiedCar(cid, ipfsGateways, board = new GatewayScoreboard()) {
+  const root = CID.parse(cid);
+  for (const gw of board.order(ipfsGateways, (g) => g)) {
+    try {
+      const res = await fetch(`${gw}/ipfs/${cid}?format=car&dag-scope=all`, {
+        headers: { Accept: "application/vnd.ipld.car" },
+        signal: AbortSignal.timeout(120000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blocks = new Map();
+      const it = await CarBlockIterator.fromBytes(new Uint8Array(await res.arrayBuffer()));
+      for await (const { cid: bc, bytes } of it) {
+        if (bc.multihash.code !== mfSha256.code) throw new Error(`unsupported hash in block ${bc}`);
+        const digest = await mfSha256.digest(bytes);
+        if (!hexEquals(sha256Hex(digest.digest), sha256Hex(bc.multihash.digest))) {
+          board.record(gw, { ok: false, reason: "mismatch", ms: 0, url: gw });
+          throw new Error(`block ${bc} does not match its hash`);
+        }
+        blocks.set(bc.multihash.bytes.toString(), { cid: bc, bytes });
+      }
+      // Walk the DAG from the root: every linked block must be present.
+      const stack = [root];
+      const seen = new Set();
+      while (stack.length) {
+        const c = stack.pop();
+        const k = c.multihash.bytes.toString();
+        if (seen.has(k)) continue;
+        seen.add(k);
+        const b = blocks.get(k);
+        if (!b) throw new Error(`CAR is missing block ${c}`);
+        if (c.code === dagPb.code) for (const link of dagPb.decode(b.bytes).Links) stack.push(link.Hash);
+      }
+      board.record(gw, { ok: true, ms: 1, url: gw });
+      return { root, blocks: [...blocks.values()], gateway: gw };
+    } catch (e) {
+      if (!String(e.message).includes("does not match"))
+        board.record(gw, { ok: false, reason: "network", ms: 0, url: gw });
+    }
+  }
+  throw new Error(`no gateway returned a complete, verified CAR for ${cid}`);
+}
+
+/** Bytes of a whole file from verified CAR blocks (UnixFS: concatenate leaf data in order). */
+export function fileBytes(root, blocks) {
+  const byKey = new Map(blocks.map((b) => [b.cid.multihash.bytes.toString(), b]));
+  const out = [];
+  const walk = (c) => {
+    const b = byKey.get(c.multihash.bytes.toString());
+    if (c.code === 0x55) return out.push(b.bytes); // raw leaf
+    const node = dagPb.decode(b.bytes);
+    if (node.Links.length === 0) {
+      out.push(unixfsData(node.Data));
+      return;
+    }
+    for (const l of node.Links) walk(l.Hash);
+  };
+  walk(root);
+  const total = out.reduce((n, p) => n + p.length, 0);
+  const buf = new Uint8Array(total);
+  let off = 0;
+  for (const p of out) {
+    buf.set(p, off);
+    off += p.length;
+  }
+  return buf;
+}
+
+/** Extract the `Data` field (field 2) from a UnixFS protobuf message. */
+function unixfsData(pb) {
+  if (!pb) return new Uint8Array(0);
+  let i = 0;
+  const varint = () => {
+    let x = 0,
+      s = 0,
+      b;
+    do {
+      b = pb[i++];
+      x += (b & 0x7f) * 2 ** s;
+      s += 7;
+    } while (b & 0x80);
+    return x;
+  };
+  while (i < pb.length) {
+    const key = varint();
+    const field = key >> 3;
+    const wire = key & 7;
+    if (wire === 2) {
+      const len = varint();
+      if (field === 2) return pb.subarray(i, i + len);
+      i += len;
+    } else if (wire === 0) varint();
+    else break;
+  }
+  return new Uint8Array(0);
+}
+
+export async function importCarInto(blocks, pinTo) {
+  if (!pinTo) return;
+  // The first block is the root (fetchVerifiedCar puts it first).
+  const { CarWriter } = await import("@ipld/car/writer");
+  const { writer, out } = CarWriter.create([blocks[0].cid]);
+  const chunks = [];
+  const collect = (async () => {
+    for await (const c of out) chunks.push(c);
+  })();
+  for (const b of blocks) await writer.put(b);
+  await writer.close();
+  await collect;
+  const form = new FormData();
+  form.append("file", new Blob(chunks), "archive.car");
+  const res = await fetch(`${pinTo.replace(/\/+$/, "")}/api/v0/dag/import?pin-roots=false`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) throw new Error(`dag import failed: HTTP ${res.status} ${await res.text()}`);
+}
+
+export async function pinCid(cid, pinTo) {
+  if (!pinTo) return;
+  const res = await fetch(`${pinTo.replace(/\/+$/, "")}/api/v0/pin/add?arg=${cid}&recursive=true`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error(`pin failed: HTTP ${res.status} ${await res.text()}`);
+}
+
+/**
  * @param {object} o
  * @param {string} o.owner owner pubkey (hex)
  * @param {string[]} o.relays bootstrap relays
@@ -145,130 +274,9 @@ export async function rebuildArchive(o) {
   // ---------- fetching ----------
   const board = new GatewayScoreboard();
 
-  /** Fetch a CAR for `cid` from gateways, verify every block, check completeness, return the blocks. */
-  async function fetchCar(cid) {
-    const root = CID.parse(cid);
-    for (const gw of board.order(ipfsGateways, (g) => g)) {
-      try {
-        const res = await fetch(`${gw}/ipfs/${cid}?format=car&dag-scope=all`, {
-          headers: { Accept: "application/vnd.ipld.car" },
-          signal: AbortSignal.timeout(120000),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const blocks = new Map();
-        const it = await CarBlockIterator.fromBytes(new Uint8Array(await res.arrayBuffer()));
-        for await (const { cid: bc, bytes } of it) {
-          if (bc.multihash.code !== mfSha256.code) throw new Error(`unsupported hash in block ${bc}`);
-          const digest = await mfSha256.digest(bytes);
-          if (!hexEquals(sha256Hex(digest.digest), sha256Hex(bc.multihash.digest))) {
-            board.record(gw, { ok: false, reason: "mismatch", ms: 0, url: gw });
-            throw new Error(`block ${bc} does not match its hash`);
-          }
-          blocks.set(bc.multihash.bytes.toString(), { cid: bc, bytes });
-        }
-        // Walk the DAG from the root: every linked block must be present.
-        const stack = [root];
-        const seen = new Set();
-        while (stack.length) {
-          const c = stack.pop();
-          const k = c.multihash.bytes.toString();
-          if (seen.has(k)) continue;
-          seen.add(k);
-          const b = blocks.get(k);
-          if (!b) throw new Error(`CAR is missing block ${c}`);
-          if (c.code === dagPb.code) for (const link of dagPb.decode(b.bytes).Links) stack.push(link.Hash);
-        }
-        board.record(gw, { ok: true, ms: 1, url: gw });
-        return { root, blocks: [...blocks.values()], gateway: gw };
-      } catch (e) {
-        if (!String(e.message).includes("does not match"))
-          board.record(gw, { ok: false, reason: "network", ms: 0, url: gw });
-      }
-    }
-    throw new Error(`no gateway returned a complete, verified CAR for ${cid}`);
-  }
-
-  /** Bytes of a whole file from verified CAR blocks (UnixFS: concatenate leaf data in order). */
-  function fileBytes(root, blocks) {
-    const byKey = new Map(blocks.map((b) => [b.cid.multihash.bytes.toString(), b]));
-    const out = [];
-    const walk = (c) => {
-      const b = byKey.get(c.multihash.bytes.toString());
-      if (c.code === 0x55) return out.push(b.bytes); // raw leaf
-      const node = dagPb.decode(b.bytes);
-      if (node.Links.length === 0) {
-        out.push(unixfsData(node.Data));
-        return;
-      }
-      for (const l of node.Links) walk(l.Hash);
-    };
-    walk(root);
-    const total = out.reduce((n, p) => n + p.length, 0);
-    const buf = new Uint8Array(total);
-    let off = 0;
-    for (const p of out) {
-      buf.set(p, off);
-      off += p.length;
-    }
-    return buf;
-  }
-
-  /** Extract the `Data` field (field 2) from a UnixFS protobuf message. */
-  function unixfsData(pb) {
-    if (!pb) return new Uint8Array(0);
-    let i = 0;
-    const varint = () => {
-      let x = 0,
-        s = 0,
-        b;
-      do {
-        b = pb[i++];
-        x += (b & 0x7f) * 2 ** s;
-        s += 7;
-      } while (b & 0x80);
-      return x;
-    };
-    while (i < pb.length) {
-      const key = varint();
-      const field = key >> 3;
-      const wire = key & 7;
-      if (wire === 2) {
-        const len = varint();
-        if (field === 2) return pb.subarray(i, i + len);
-        i += len;
-      } else if (wire === 0) varint();
-      else break;
-    }
-    return new Uint8Array(0);
-  }
-
-  async function importCar(blocks) {
-    if (!pinTo) return;
-    const { CarWriter } = await import("@ipld/car/writer");
-    const { writer, out } = CarWriter.create([blocks[0].cid]);
-    const chunks = [];
-    const collect = (async () => {
-      for await (const c of out) chunks.push(c);
-    })();
-    for (const b of blocks) await writer.put(b);
-    await writer.close();
-    await collect;
-    const form = new FormData();
-    form.append("file", new Blob(chunks), "archive.car");
-    const res = await fetch(`${pinTo.replace(/\/+$/, "")}/api/v0/dag/import?pin-roots=false`, {
-      method: "POST",
-      body: form,
-    });
-    if (!res.ok) throw new Error(`dag import failed: HTTP ${res.status} ${await res.text()}`);
-  }
-
-  async function pinRoot(cid) {
-    if (!pinTo) return;
-    const res = await fetch(`${pinTo.replace(/\/+$/, "")}/api/v0/pin/add?arg=${cid}&recursive=true`, {
-      method: "POST",
-    });
-    if (!res.ok) throw new Error(`pin failed: HTTP ${res.status} ${await res.text()}`);
-  }
+  const fetchCar = (cid) => fetchVerifiedCar(cid, ipfsGateways, board);
+  const importCar = (blocks) => importCarInto(blocks, pinTo);
+  const pinRoot = (cid) => pinCid(cid, pinTo);
 
   /** Fetch one content-addressed object (file or directory); verify; optionally pin; return file bytes when asked. */
   async function restore(cid, expectSha, label, wantBytes = false) {
