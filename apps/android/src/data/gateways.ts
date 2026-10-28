@@ -70,7 +70,8 @@ export class GatewayClient {
     return [...this.flagged.keys()];
   }
 
-  private record(base: string, reason: SourceReport["reason"]): void {
+  /** Note a source's result; a hash mismatch flags the gateway for the Verify panel. */
+  record(base: string, reason: SourceReport["reason"]): void {
     if (reason !== "mismatch") return;
     this.flagged.set(base, (this.flagged.get(base) ?? 0) + 1);
     this.listeners.forEach((l) => l());

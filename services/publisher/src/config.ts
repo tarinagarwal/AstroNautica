@@ -21,6 +21,8 @@ export interface PublisherConfig {
   stagingDir: string;
   workDir: string;
   seedDir: string;
+  /** Where the seed box watches for new .torrent files (default: seedDir). */
+  seedWatchDir: string;
   ownerPubkey: string;
   bootstrapRelays: string[];
   bootstrapListEvents?: string;
@@ -67,6 +69,7 @@ export function loadConfig(rawEnv: NodeJS.ProcessEnv = process.env, root = findR
     stagingDir: resolve(root, need(env.STAGING_DIR ?? devConfig?.stagingDir, "STAGING_DIR")),
     workDir: resolve(root, env.WORK_DIR ?? devConfig?.workDir ?? ".dev/publisher-work"),
     seedDir: resolve(root, env.SEED_DIR ?? devConfig?.seedDir ?? ".dev/seed"),
+    seedWatchDir: resolve(root, env.SEEDBOX_WATCH_DIR ?? env.SEED_DIR ?? devConfig?.seedDir ?? ".dev/seed"),
     ownerPubkey: need(env.OWNER_PUBKEY ?? devConfig?.ownerPubkey, "OWNER_PUBKEY"),
     bootstrapRelays: list(env.RELAYS, devConfig?.relays ?? []),
     bootstrapListEvents:

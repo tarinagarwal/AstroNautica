@@ -37,6 +37,7 @@ secrets:
   arweave_wallet: { file: ./secrets/arweave_wallet.json }
   evm_private_key: { file: ./secrets/evm_private_key }
   seedbox_rpc_password: { file: ./secrets/seedbox_rpc_password }
+  pinning_services: { file: ./secrets/pinning_services.json }
   tls_fullchain: { file: ./secrets/tls_fullchain.pem }
   tls_privkey: { file: ./secrets/tls_privkey.pem }
 
@@ -51,6 +52,7 @@ volumes:
   staging: # encrypted submission blobs (api writes, publisher reads)
   seed: # published video files (complete/), shared with the seedbox
   seed-watch: # .torrent files the publisher drops for the seedbox to pick up
+  publisher-work: # decrypted, approved media while it is processed (deleted after publishing)
   relay-db:
   ipfs-data:
   seedbox-config:
@@ -99,7 +101,13 @@ services:
     cap_drop: [ALL]
     environment:
       NODE_ENV: production
+      HOST: 0.0.0.0
       PORT: "3000"
+      # Every door clients use to reach the API (NIP-98 binds signatures to the URL); same path on all of them.
+      PUBLIC_URL: ${API_PUBLIC_URLS:?set API_PUBLIC_URLS in .env, e.g. https://azaadawaaz.org/api,http://<onion>/api}
+      ALLOWED_ORIGINS: ${WEB_ORIGINS:?set WEB_ORIGINS in .env}
+      OWNER_PUBKEY: ${OWNER_PUBKEY:?set OWNER_PUBKEY in .env}
+      RELAYS: ws://relay:7777${EXTRA_RELAYS:+,${EXTRA_RELAYS}}
       DATABASE_HOST: postgres
       DATABASE_PORT: "5432"
       DATABASE_NAME: azaadawaaz
@@ -145,37 +153,43 @@ services:
     cap_drop: [ALL]
     environment:
       NODE_ENV: production
+      OWNER_PUBKEY: ${OWNER_PUBKEY:?set OWNER_PUBKEY in .env}
       DATABASE_HOST: postgres
       DATABASE_NAME: azaadawaaz
       DATABASE_USER: azaad
       DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
-      PUBLISHER_NOSTR_KEY_FILE: /run/secrets/publisher_nostr_key
-      PUBLISHER_X25519_KEY_FILE: /run/secrets/publisher_x25519_key
-      ARWEAVE_WALLET_FILE: /run/secrets/arweave_wallet
+      # Secrets (see services/publisher/README.md); files hold the bare value, no trailing newline needed.
+      PUBLISHER_NSEC_FILE: /run/secrets/publisher_nostr_key
+      PUBLISHER_X25519_PRIVATE_FILE: /run/secrets/publisher_x25519_key
+      PUBLISHER_EVM_KEY_FILE: /run/secrets/evm_private_key
+      PINNING_SERVICES_FILE: /run/secrets/pinning_services
+      ARWEAVE_JWK: /run/secrets/arweave_wallet
       ARWEAVE_URL: ${ARWEAVE_URL:-https://arweave.net}
-      EVM_PRIVATE_KEY_FILE: /run/secrets/evm_private_key
-      # chainId=rpcUrl pairs; decisions.md D7 (Base 8453, BNB Smart Chain 56)
-      EVM_RPC_URLS: ${EVM_RPC_URLS:?set EVM_RPC_URLS in .env}
-      REGISTRY_ADDRESSES: ${REGISTRY_ADDRESSES:?set REGISTRY_ADDRESSES in .env}
+      ARWEAVE_DEV_MINE: "false"
+      ARWEAVE_MAX_VIDEO_BYTES: ${ARWEAVE_MAX_VIDEO_BYTES:-0}
+      # JSON: [{"key":"base","chainId":8453,"rpc":"https://...","registry":"0x..."},{"key":"bsc","chainId":56,...}]
+      CHAINS: ${CHAINS_JSON:?set CHAINS_JSON in .env (decisions.md D7)}
       # Our local relay first, then the other relays from the signed list.
       RELAYS: ws://relay:7777${EXTRA_RELAYS:+,${EXTRA_RELAYS}}
-      IPFS_API_URLS: http://ipfs:5001${EXTRA_IPFS_API_URLS:+,${EXTRA_IPFS_API_URLS}}
+      REQUIRED_RELAY_SUCCESSES: ${REQUIRED_RELAY_SUCCESSES:-3}
+      # At least two Kubo nodes in different countries (spec §6 step 3): this host's and another host's.
+      IPFS_APIS: http://ipfs:5001${EXTRA_IPFS_API_URLS:+,${EXTRA_IPFS_API_URLS}}
+      IPFS_GATEWAYS: ${PUBLIC_IPFS_GATEWAYS:?set PUBLIC_IPFS_GATEWAYS in .env}
       STAGING_DIR: /var/lib/azaadawaaz/staging
-      SEED_DIR: /var/lib/azaadawaaz/seed
+      WORK_DIR: /var/lib/azaadawaaz/work
+      # Transmission seeds from /downloads/complete (the `seed` volume) and watches /watch (`seed-watch`).
+      SEED_DIR: /var/lib/azaadawaaz/seed/complete
       SEEDBOX_WATCH_DIR: /var/lib/azaadawaaz/seed/watch
-      SEEDBOX_DATA_DIR: /var/lib/azaadawaaz/seed/complete
-      SEEDBOX_RPC_URL: http://seedbox:9091/transmission/rpc
-      SEEDBOX_RPC_USER: azaad
-      SEEDBOX_RPC_PASSWORD_FILE: /run/secrets/seedbox_rpc_password
     secrets:
       - postgres_password
       - publisher_nostr_key
       - publisher_x25519_key
       - arweave_wallet
       - evm_private_key
-      - seedbox_rpc_password
+      - pinning_services
     volumes:
       - staging:/var/lib/azaadawaaz/staging:ro
+      - publisher-work:/var/lib/azaadawaaz/work
       - seed:/var/lib/azaadawaaz/seed
       - seed-watch:/var/lib/azaadawaaz/seed/watch
     depends_on:

@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import createTorrent from "create-torrent";
 import { encode as encodeMagnet } from "magnet-uri";
@@ -28,6 +28,8 @@ export async function createVideoTorrent(args: {
   /** Web seed base URLs: each must serve the torrent's files below it, e.g. `https://gw/ipfs/<dirCid>/`. */
   webSeeds: string[];
   seedDir: string;
+  /** Where the seed box picks up .torrent files (default: seedDir). Written last, after the data is in place. */
+  watchDir?: string;
 }): Promise<TorrentResult> {
   const root = join(args.seedDir, args.name);
   mkdirSync(root, { recursive: true });
@@ -56,8 +58,12 @@ export async function createVideoTorrent(args: {
       (err: Error | null, t: Buffer) => (err ? reject(err) : resolve(t)),
     ),
   );
-  const torrentPath = join(args.seedDir, `${args.name}.torrent`);
-  writeFileSync(torrentPath, torrent);
+  const watch = args.watchDir ?? args.seedDir;
+  mkdirSync(watch, { recursive: true });
+  const torrentPath = join(watch, `${args.name}.torrent`);
+  // The seed box (uid 1000) must be able to read it; write atomically so it never sees a partial file.
+  writeFileSync(`${torrentPath}.part`, torrent, { mode: 0o644 });
+  renameSync(`${torrentPath}.part`, torrentPath);
   const infoHash = infoHashOf(torrent);
   const uri = encodeMagnet({
     xt: `urn:btih:${infoHash}`,

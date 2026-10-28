@@ -376,7 +376,13 @@ export class Pipeline {
         await this.d.ipfs.addDirectory(files.map((f) => ({ path: `${name}/${f.path}`, content: f.content })))
       ).cid;
       const webSeeds = this.d.config.ipfsGateways.map((g) => `${g.replace(/\/+$/, "")}/ipfs/${dirCid}/`);
-      const t = await createVideoTorrent({ name, files, webSeeds, seedDir: this.d.config.seedDir });
+      const t = await createVideoTorrent({
+        name,
+        files,
+        webSeeds,
+        seedDir: this.d.config.seedDir,
+        watchDir: this.d.config.seedWatchDir,
+      });
       out[sha] = { magnet: t.magnet, infoHash: t.infoHash, dirCid };
     }
     return out;
@@ -605,10 +611,16 @@ export class Pipeline {
         }
       }
     }
-    rmSync(join(this.d.config.stagingDir, row.id), { recursive: true, force: true });
+    // Staging is normally mounted read-only here; the API's retention job deletes it then (spec §5.2).
+    let stagingDeleted = true;
+    try {
+      rmSync(join(this.d.config.stagingDir, row.id), { recursive: true, force: true });
+    } catch {
+      stagingDeleted = false;
+    }
     rmSync(this.work(row.id), { recursive: true, force: true });
     await this.d.db.finishJob(row.id);
-    return { pinStatus, stagingDeleted: true };
+    return { pinStatus, stagingDeleted };
   }
 }
 

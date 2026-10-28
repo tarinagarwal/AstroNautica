@@ -57,7 +57,14 @@ const defaults = {
   powDifficulty: Number.isInteger(config.powDifficulty) ? config.powDifficulty : 16,
 };
 
-const json = JSON.stringify(defaults, null, 2) + "\n";
+let json = JSON.stringify(defaults, null, 2) + "\n";
+try {
+  // Match the repository's formatting when Prettier is installed (it is a root dev dependency).
+  const prettier = await import("prettier");
+  json = await prettier.format(json, { parser: "json", printWidth: 120 });
+} catch {
+  // plain JSON is fine
+}
 const prev = existsSync(out) ? readFileSync(out, "utf8") : "";
 if (prev !== json) writeFileSync(out, json);
 console.log(

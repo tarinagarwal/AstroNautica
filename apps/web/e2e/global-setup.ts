@@ -5,7 +5,7 @@
  * relay with the real core functions.
  */
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync, readdirSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,6 +33,8 @@ const out = join(web, "test-results/e2e");
 export const PORTS = { relay: 7791, http: 7792, api: 7793, app: 4791 };
 const RELAY = `ws://127.0.0.1:${PORTS.relay}`;
 const CONTAINER = "web-test-relay";
+/** The localnet build under test; removed afterwards so lint and format never see it. */
+const DIST = join(out, "dist");
 
 function startRelay(): void {
   const conf = readFileSync(join(repo, "infra/relay/strfry.conf"), "utf8")
@@ -232,11 +234,11 @@ export default async function globalSetup() {
       DEFAULTS_LIST_EVENTS: join(out, "list-events.json"),
     },
   });
-  await build({ root: web, mode: "localnet", logLevel: "warn", build: { outDir: "dist-e2e", emptyOutDir: true } });
+  await build({ root: web, mode: "localnet", logLevel: "warn", build: { outDir: DIST, emptyOutDir: true } });
   const server = await preview({
     root: web,
     mode: "localnet",
-    build: { outDir: "dist-e2e" },
+    build: { outDir: DIST },
     preview: { port: PORTS.app, strictPort: true, host: "127.0.0.1" },
   });
 
@@ -262,6 +264,8 @@ export default async function globalSetup() {
     } catch {
       // already gone
     }
+    for (const f of [DIST, "config.json", "list-events.json", "world.json", "strfry.conf", "video"])
+      rmSync(join(out, f), { recursive: true, force: true });
     // Put the developer's defaults back.
     execFileSync("node", ["scripts/gen-defaults.mjs"], { cwd: web, stdio: "ignore" });
   };
