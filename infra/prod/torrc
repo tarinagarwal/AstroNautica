@@ -1,0 +1,54 @@
+## AzaadAwaaz onion services (spec §10, §11).
+##
+## Two v3 onion services in front of the `web` container, reached over unix
+## sockets in the shared `onion-sockets` volume (no TCP hop, no client
+## addresses anywhere):
+##   web : the public site            -> /run/onion/web.sock
+##   mod : the moderator area         -> /run/onion/mod.sock (client authorisation)
+##
+## Keys: the vanity `azaad...` key made with mkp224o goes in
+## /var/lib/tor/hs_web/ (hs_ed25519_secret_key, hs_ed25519_public_key,
+## hostname), mode 0700, owned by the tor user. Back the keys up encrypted, in
+## two places. See infra/prod/README.md.
+##
+## The second onion "on a separate server" (spec §10) is this same container
+## deployed on the second host with its own key; add Onionbalance in front of
+## both if load requires.
+
+DataDirectory /var/lib/tor
+# This container only hosts onion services: no SOCKS client, no relaying.
+SocksPort 0
+ClientOnly 1
+ExitRelay 0
+ExitPolicy reject *:*
+# Log to stdout at notice level; SafeLogging scrubs addresses from Tor's logs.
+Log notice stdout
+SafeLogging 1
+AvoidDiskWrites 1
+
+## ---------------------------------------------------------------- public web
+HiddenServiceDir /var/lib/tor/hs_web
+HiddenServiceVersion 3
+HiddenServicePort 80 unix:/run/onion/web.sock
+# Tor's proof-of-work DoS defence (needs Tor >= 0.4.8 built with the pow module).
+HiddenServicePoWDefensesEnabled 1
+HiddenServicePoWQueueRate 250
+HiddenServicePoWQueueBurst 2500
+# Rate-limit introductions at the introduction points too.
+HiddenServiceEnableIntroDoSDefense 1
+HiddenServiceEnableIntroDoSRatePerSec 25
+HiddenServiceEnableIntroDoSBurstPerSec 200
+HiddenServiceMaxStreams 200
+HiddenServiceMaxStreamsCloseCircuit 1
+
+## ----------------------------------------------------------- moderator area
+## Only clients whose public keys are in /var/lib/tor/hs_mod/authorized_clients/
+## (one <name>.auth file per moderator: "descriptor:x25519:<base32 pubkey>")
+## can even find this service's descriptor.
+HiddenServiceDir /var/lib/tor/hs_mod
+HiddenServiceVersion 3
+HiddenServicePort 80 unix:/run/onion/mod.sock
+HiddenServicePoWDefensesEnabled 1
+HiddenServiceEnableIntroDoSDefense 1
+HiddenServiceMaxStreams 50
+HiddenServiceMaxStreamsCloseCircuit 1

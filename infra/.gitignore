@@ -1,0 +1,12 @@
+# Local settings and secrets
+.env
+**/.env
+!**/.env.example
+prod/secrets/*
+!prod/secrets/README.md
+
+# Bind-mounted data, if anyone points a volume at the tree (compose uses named volumes)
+**/data/
+**/strfry-db/
+mirror/web/
+node_modules/

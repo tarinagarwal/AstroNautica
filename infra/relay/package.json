@@ -1,0 +1,12 @@
+{
+  "name": "@azaadawaaz/relay-policy",
+  "private": true,
+  "version": "0.1.0",
+  "description": "strfry write-policy plugin: NIP-13 proof-of-work, per-pubkey rate limits and comment length for kinds 1111 and 7",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "smoke": "node scripts/pow-smoke.mjs"
+  }
+}

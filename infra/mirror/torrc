@@ -1,0 +1,16 @@
+## Optional onion service for a mirror (compose profile "onion").
+DataDirectory /var/lib/tor
+SocksPort 0
+ClientOnly 1
+ExitRelay 0
+ExitPolicy reject *:*
+Log notice stdout
+SafeLogging 1
+
+HiddenServiceDir /var/lib/tor/hs_web
+HiddenServiceVersion 3
+HiddenServicePort 80 unix:/run/onion/web.sock
+HiddenServicePoWDefensesEnabled 1
+HiddenServiceEnableIntroDoSDefense 1
+HiddenServiceMaxStreams 200
+HiddenServiceMaxStreamsCloseCircuit 1

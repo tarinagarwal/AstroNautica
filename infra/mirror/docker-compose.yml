@@ -1,0 +1,135 @@
+# AzaadAwaaz mirror kit (spec §10).
+#
+#   cd infra/mirror && cp .env.example .env && docker compose up -d
+#
+# A mirror is: the static web app + an IPFS node pinning everything + a Nostr
+# relay (strfry) + a sync job that keeps all three current from the official,
+# owner-signed lists. Mirrors appear in the signed mirror list once the owner
+# approves them. See README.md.
+
+name: azaadawaaz-mirror
+
+x-base: &base
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+
+volumes:
+  web-root:       # exported web app builds: /srv/web/<cid>, /srv/web/current -> <cid>
+  ipfs-data:
+  relay-db:
+  sync-state:     # last verified lists, cursors
+  onion-keys:
+  onion-sockets:
+
+services:
+  web:
+    <<: *base
+    image: nginx:1.27-alpine
+    read_only: true
+    tmpfs: ["/tmp", "/var/cache/nginx"]
+    logging: { driver: none }
+    ports: ["${WEB_PORT:-80}:80"]
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../prod/azaad-headers.conf:/etc/nginx/azaad-headers.conf:ro
+      - web-root:/srv/web:ro
+      - onion-sockets:/run/onion
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  ipfs:
+    <<: *base
+    image: ipfs/kubo:v0.38.1
+    command: ["daemon", "--migrate=true", "--enable-gc"]
+    environment:
+      IPFS_PROFILE: server
+      IPFS_STORAGE_MAX: ${IPFS_STORAGE_MAX:-200GB}
+      IPFS_PEERING: ${IPFS_PEERING:-}
+    ports:
+      - "${IPFS_SWARM_PORT:-4001}:4001/tcp"
+      - "${IPFS_SWARM_PORT:-4001}:4001/udp"
+      # Read-only gateway serving only what this mirror pins (Gateway.NoFetch).
+      - "${IPFS_GATEWAY_PORT:-8080}:8080"
+    volumes:
+      - ipfs-data:/data/ipfs
+      - ../prod/ipfs/001-azaad-prod.sh:/container-init.d/001-azaad-prod.sh:ro
+    healthcheck:
+      test: ["CMD", "ipfs", "--api=/ip4/127.0.0.1/tcp/5001", "id"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  relay:
+    <<: *base
+    build:
+      context: ../relay
+    image: azaadawaaz/relay:mirror
+    logging: { driver: none }
+    environment:
+      POW_DIFFICULTY: ${POW_DIFFICULTY:-16}
+      RATE_COMMENTS_PER_MINUTE: ${RATE_COMMENTS_PER_MINUTE:-10}
+      RATE_REACTIONS_PER_MINUTE: ${RATE_REACTIONS_PER_MINUTE:-60}
+      MAX_COMMENT_CHARS: ${MAX_COMMENT_CHARS:-2000}
+      # Live stream of new events from the official relays (strfry stream).
+      # History and later additions to the relay list are handled by mirror-sync.
+      STREAMS: ${UPSTREAM_RELAYS:-wss://relay.azaadawaaz.org}
+    ports: ["${RELAY_PORT:-7777}:7777"]
+    volumes: ["relay-db:/app/strfry-db"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-H", "Accept: application/nostr+json", "http://localhost:7777/"]
+      interval: 60s
+      start_period: 60s
+      start_interval: 2s
+      timeout: 5s
+      retries: 3
+
+  # Verifies the owner-signed lists and keeps web, IPFS and relay in sync.
+  # Implementation: services/mirror-sync (see README.md for what it does).
+  sync:
+    <<: *base
+    build:
+      context: ../..
+      dockerfile: services/mirror-sync/Dockerfile
+    image: azaadawaaz/mirror-sync:${RELEASE:-latest}
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    environment:
+      # Trust anchor: the owner's public key. Every list is verified against it
+      # (and moderator lists against the owner-signed moderator list).
+      OWNER_PUBKEY: ${OWNER_PUBKEY:?set OWNER_PUBKEY (owner npub or hex) in .env}
+      BOOTSTRAP_RELAYS: ${UPSTREAM_RELAYS:-wss://relay.azaadawaaz.org}
+      BOOTSTRAP_GATEWAYS: ${BOOTSTRAP_GATEWAYS:-https://ipfs.azaadawaaz.org,https://dweb.link}
+      LOCAL_RELAY_URL: ws://relay:7777
+      LOCAL_IPFS_API_URL: http://ipfs:5001
+      WEB_ROOT: /srv/web
+      STATE_DIR: /var/lib/mirror-sync
+      SYNC_INTERVAL_SECONDS: ${SYNC_INTERVAL_SECONDS:-600}
+    volumes:
+      - web-root:/srv/web
+      - sync-state:/var/lib/mirror-sync
+    depends_on:
+      ipfs: { condition: service_healthy }
+      relay: { condition: service_healthy }
+
+  # Optional: `docker compose --profile onion up -d` adds a Tor onion service
+  # for this mirror (Tor's PoW DoS defence on).
+  onion:
+    <<: *base
+    profiles: [onion]
+    image: osminogin/tor-simple:0.4.9.14
+    logging: { driver: none }
+    command: ["tor", "-f", "/etc/tor/torrc"]
+    volumes:
+      - ./torrc:/etc/tor/torrc:ro
+      - onion-keys:/var/lib/tor
+      - onion-sockets:/run/onion
+    depends_on: [web]
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /var/lib/tor/hs_web/hostname"]
+      interval: 60s
+      timeout: 5s
+      retries: 3

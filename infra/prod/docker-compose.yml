@@ -1,0 +1,299 @@
+# AzaadAwaaz production stack for one host (spec §10, §11, §12).
+#
+# NOT DEPLOYED from here automatically. Each production host runs this file
+# (two or more hosts, in different countries and with different providers);
+# relay, ipfs and onion are what get repeated across hosts.
+#
+#   cd infra/prod
+#   cp .env.example .env            # edit
+#   ./secrets/README.md             # create the secret files listed there
+#   docker compose up -d --build
+#
+# Networks:
+#   edge     - reachable from the internet through published ports (web, seedbox, ipfs swarm)
+#   backend  - internal only (no internet): postgres, api, media, relay, ipfs RPC, seedbox RPC
+#   egress   - outbound internet for the publisher (Arweave, EVM RPCs, other relays)
+#
+# Privacy (spec §12): no service logs client addresses. web and relay are also
+# run with the `none` log driver; the seedbox too, because its peers are readers.
+
+name: azaadawaaz
+
+x-hardening: &hardening
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+x-no-logs: &no-logs
+  logging:
+    driver: none
+
+secrets:
+  postgres_password:    { file: ./secrets/postgres_password }
+  publisher_nostr_key:  { file: ./secrets/publisher_nostr_key }
+  publisher_x25519_key: { file: ./secrets/publisher_x25519_key }
+  arweave_wallet:       { file: ./secrets/arweave_wallet.json }
+  evm_private_key:      { file: ./secrets/evm_private_key }
+  seedbox_rpc_password: { file: ./secrets/seedbox_rpc_password }
+  tls_fullchain:        { file: ./secrets/tls_fullchain.pem }
+  tls_privkey:          { file: ./secrets/tls_privkey.pem }
+
+networks:
+  edge:
+  backend:
+    internal: true
+  egress:
+
+volumes:
+  postgres-data:
+  staging:        # encrypted submission blobs (api writes, media/publisher read)
+  seed:           # published video files (complete/), shared with the seedbox
+  seed-watch:     # .torrent files the publisher drops for the seedbox to pick up
+  relay-db:
+  ipfs-data:
+  seedbox-config:
+  onion-keys:     # Tor onion service keys - BACK UP ENCRYPTED, IN TWO PLACES
+  onion-sockets:  # unix sockets between web (nginx) and onion (tor)
+  acme:
+
+services:
+  postgres:
+    <<: *hardening
+    image: postgres:16-alpine
+    networks: [backend]
+    environment:
+      POSTGRES_DB: azaadawaaz
+      POSTGRES_USER: azaad
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    command: ["postgres", "-c", "log_connections=off", "-c", "log_disconnections=off",
+              "-c", "log_hostname=off", "-c", "password_encryption=scram-sha-256"]
+    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U azaad -d azaadawaaz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    <<: *hardening
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+    image: azaadawaaz/api:${RELEASE:-latest}
+    networks: [backend]
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: azaadawaaz
+      DATABASE_USER: azaad
+      DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
+      STAGING_DIR: /var/lib/azaadawaaz/staging
+      # The api never sees client addresses (nginx strips them); do not add a
+      # trust-proxy setting that would bring them back.
+      TRUST_PROXY: "false"
+    secrets: [postgres_password]
+    volumes: ["staging:/var/lib/azaadawaaz/staging"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  # Media parsers are an attack surface (spec §12): no network at all beyond
+  # the internal one, read-only root, no capabilities, bounded resources.
+  media:
+    <<: *hardening
+    build:
+      context: ../..
+      dockerfile: services/media/Dockerfile
+    image: azaadawaaz/media:${RELEASE:-latest}
+    networks: [backend]
+    read_only: true
+    tmpfs: ["/tmp:size=4g"]
+    cap_drop: [ALL]
+    pids_limit: 256
+    mem_limit: 4g
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      DATABASE_HOST: postgres
+      DATABASE_NAME: azaadawaaz
+      DATABASE_USER: azaad
+      DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
+      STAGING_DIR: /var/lib/azaadawaaz/staging
+      SEED_DIR: /var/lib/azaadawaaz/seed
+    secrets: [postgres_password]
+    volumes:
+      - staging:/var/lib/azaadawaaz/staging
+      - seed:/var/lib/azaadawaaz/seed
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  # The only holder of the publisher key (spec §12). Rotate by replacing the
+  # secret file and `docker compose up -d publisher`.
+  publisher:
+    <<: *hardening
+    build:
+      context: ../..
+      dockerfile: services/publisher/Dockerfile
+    image: azaadawaaz/publisher:${RELEASE:-latest}
+    networks: [backend, egress]
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    environment:
+      NODE_ENV: production
+      DATABASE_HOST: postgres
+      DATABASE_NAME: azaadawaaz
+      DATABASE_USER: azaad
+      DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
+      PUBLISHER_NOSTR_KEY_FILE: /run/secrets/publisher_nostr_key
+      PUBLISHER_X25519_KEY_FILE: /run/secrets/publisher_x25519_key
+      ARWEAVE_WALLET_FILE: /run/secrets/arweave_wallet
+      ARWEAVE_URL: ${ARWEAVE_URL:-https://arweave.net}
+      EVM_PRIVATE_KEY_FILE: /run/secrets/evm_private_key
+      # chainId=rpcUrl pairs; decisions.md D7 (Base 8453, BNB Smart Chain 56)
+      EVM_RPC_URLS: ${EVM_RPC_URLS:?set EVM_RPC_URLS in .env}
+      REGISTRY_ADDRESSES: ${REGISTRY_ADDRESSES:?set REGISTRY_ADDRESSES in .env}
+      # Our local relay first, then the other relays from the signed list.
+      RELAYS: ws://relay:7777${EXTRA_RELAYS:+,${EXTRA_RELAYS}}
+      IPFS_API_URLS: http://ipfs:5001${EXTRA_IPFS_API_URLS:+,${EXTRA_IPFS_API_URLS}}
+      STAGING_DIR: /var/lib/azaadawaaz/staging
+      SEED_DIR: /var/lib/azaadawaaz/seed
+      SEEDBOX_WATCH_DIR: /var/lib/azaadawaaz/seed/watch
+      SEEDBOX_DATA_DIR: /var/lib/azaadawaaz/seed/complete
+      SEEDBOX_RPC_URL: http://seedbox:9091/transmission/rpc
+      SEEDBOX_RPC_USER: azaad
+      SEEDBOX_RPC_PASSWORD_FILE: /run/secrets/seedbox_rpc_password
+    secrets:
+      - postgres_password
+      - publisher_nostr_key
+      - publisher_x25519_key
+      - arweave_wallet
+      - evm_private_key
+      - seedbox_rpc_password
+    volumes:
+      - staging:/var/lib/azaadawaaz/staging:ro
+      - seed:/var/lib/azaadawaaz/seed
+      - seed-watch:/var/lib/azaadawaaz/seed/watch
+    depends_on:
+      postgres: { condition: service_healthy }
+      relay: { condition: service_healthy }
+      ipfs: { condition: service_healthy }
+
+  relay:
+    <<: [*no-logs, *hardening]
+    build:
+      context: ../relay
+    image: azaadawaaz/relay:${RELEASE:-latest}
+    networks: [backend, edge]
+    environment:
+      POW_DIFFICULTY: ${POW_DIFFICULTY:-16}
+      RATE_COMMENTS_PER_MINUTE: ${RATE_COMMENTS_PER_MINUTE:-10}
+      RATE_REACTIONS_PER_MINUTE: ${RATE_REACTIONS_PER_MINUTE:-60}
+      MAX_COMMENT_CHARS: ${MAX_COMMENT_CHARS:-2000}
+    ulimits:
+      nofile: { soft: 524288, hard: 524288 }
+    volumes: ["relay-db:/app/strfry-db"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-H", "Accept: application/nostr+json", "http://localhost:7777/"]
+      interval: 60s
+      start_period: 60s
+      start_interval: 2s
+      timeout: 5s
+      retries: 3
+
+  ipfs:
+    <<: *hardening
+    image: ipfs/kubo:v0.38.1
+    command: ["daemon", "--migrate=true", "--enable-gc"]
+    networks: [backend, edge]
+    environment:
+      IPFS_PROFILE: server
+      IPFS_STORAGE_MAX: ${IPFS_STORAGE_MAX:-500GB}
+      IPFS_PEERING: ${IPFS_PEERING:-}
+    ports:
+      - "4001:4001/tcp"
+      - "4001:4001/udp"
+    volumes:
+      - ipfs-data:/data/ipfs
+      - ./ipfs/001-azaad-prod.sh:/container-init.d/001-azaad-prod.sh:ro
+    healthcheck:
+      test: ["CMD", "ipfs", "--api=/ip4/127.0.0.1/tcp/5001", "id"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Seeds video torrents (spec §11). The publisher writes finished files to
+  # seed/complete/ and the matching .torrent to seed/watch/; Transmission
+  # picks the .torrent up, finds the data already in place, verifies it and
+  # seeds. RPC (9091) is reachable only on the backend network.
+  seedbox:
+    <<: [*no-logs, *hardening]
+    image: linuxserver/transmission:4.0.6
+    networks: [backend, edge]
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Etc/UTC
+      USER: azaad
+      FILE__PASS: /run/secrets/seedbox_rpc_password
+      PEERPORT: "51413"
+      # RPC only from the backend network (docker's private ranges).
+      WHITELIST: "127.0.0.1,172.*.*.*,10.*.*.*,192.168.*.*"
+      HOST_WHITELIST: "seedbox"
+    secrets: [seedbox_rpc_password]
+    ports:
+      - "51413:51413/tcp"
+      - "51413:51413/udp"
+    volumes:
+      - seedbox-config:/config
+      - seed:/downloads        # Transmission's download-dir is /downloads/complete
+      - seed-watch:/watch
+
+  web:
+    <<: [*no-logs, *hardening]
+    build:
+      context: ../..
+      dockerfile: infra/prod/web.Dockerfile
+    image: azaadawaaz/web:${RELEASE:-latest}
+    networks: [edge, backend]
+    read_only: true
+    tmpfs: ["/tmp", "/var/cache/nginx"]
+    ports:
+      - "80:80"
+      - "443:443"
+    secrets: [tls_fullchain, tls_privkey]
+    volumes:
+      - onion-sockets:/run/onion
+      - acme:/var/www/acme:ro
+    depends_on: [api, relay, ipfs]
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Tor v3 onion services in front of web: public site + moderator area
+  # (torrc). Tor's proof-of-work DoS defence is on. Needs only outbound
+  # internet to reach the Tor network; no published ports.
+  onion:
+    <<: [*no-logs, *hardening]
+    image: osminogin/tor-simple:0.4.9.14
+    networks: [egress]
+    command: ["tor", "-f", "/etc/tor/torrc"]
+    volumes:
+      - ./torrc:/etc/tor/torrc:ro
+      - onion-keys:/var/lib/tor
+      - onion-sockets:/run/onion
+    depends_on: [web]
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /var/lib/tor/hs_web/hostname && test -s /var/lib/tor/hs_mod/hostname"]
+      interval: 60s
+      timeout: 5s
+      retries: 3

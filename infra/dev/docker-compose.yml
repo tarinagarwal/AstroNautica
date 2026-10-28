@@ -1,0 +1,167 @@
+# AzaadAwaaz local development network (spec §11, §15).
+#
+# Everything the services and end-to-end tests talk to, on localhost only:
+#   relay-a, relay-b   strfry + AzaadAwaaz write policy   ws://127.0.0.1:7777, :7778
+#   ipfs-a, ipfs-b     Kubo, peered, CIDv1                API :5001/:5002, gateway :8080/:8081
+#   postgres           PostgreSQL 16 (DEV CREDENTIALS)    127.0.0.1:5432
+#   arlocal            Arweave test environment           http://127.0.0.1:1984
+#   anvil              EVM chain 31337 ("Base" stand-in)  http://127.0.0.1:8545
+#   anvil-bsc          EVM chain 97 ("BSC" stand-in)      http://127.0.0.1:8546
+#
+# Usage (from the repo root):  docker compose -f infra/dev/docker-compose.yml up -d
+# See infra/dev/README.md.
+#
+# Every port is published on 127.0.0.1 only. Data lives in named Docker
+# volumes (never in the repository); `down -v` wipes it.
+
+name: azaadawaaz-dev
+
+x-relay: &relay
+  build:
+    context: ../relay
+  image: azaadawaaz/relay:dev
+  restart: unless-stopped
+  environment:
+    POW_DIFFICULTY: ${POW_DIFFICULTY:-16}
+    RATE_COMMENTS_PER_MINUTE: ${RATE_COMMENTS_PER_MINUTE:-10}
+    RATE_REACTIONS_PER_MINUTE: ${RATE_REACTIONS_PER_MINUTE:-60}
+    MAX_COMMENT_CHARS: ${MAX_COMMENT_CHARS:-2000}
+  healthcheck:
+    test: ["CMD", "curl", "-fsS", "-H", "Accept: application/nostr+json", "http://localhost:7777/"]
+    # strfry logs every HTTP request, so probe often only while starting.
+    interval: 60s
+    start_period: 60s
+    start_interval: 2s
+    timeout: 3s
+    retries: 3
+
+x-ipfs: &ipfs
+  image: ipfs/kubo:v0.38.1
+  restart: unless-stopped
+  command: ["daemon", "--migrate=true", "--enable-gc"]
+  healthcheck:
+    test: ["CMD", "ipfs", "--api=/ip4/127.0.0.1/tcp/5001", "id"]
+    interval: 5s
+    timeout: 5s
+    retries: 30
+
+x-anvil: &anvil
+  build:
+    context: ./anvil
+  image: azaadawaaz/anvil:dev
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "cast", "chain-id", "--rpc-url", "http://127.0.0.1:8545"]
+    interval: 5s
+    timeout: 3s
+    retries: 20
+
+services:
+  relay-a:
+    <<: *relay
+    ports: ["127.0.0.1:${RELAY_A_PORT:-7777}:7777"]
+    volumes: ["relay-a-db:/app/strfry-db"]
+
+  relay-b:
+    <<: *relay
+    ports: ["127.0.0.1:${RELAY_B_PORT:-7778}:7777"]
+    volumes: ["relay-b-db:/app/strfry-db"]
+
+  ipfs-a:
+    <<: *ipfs
+    ports:
+      - "127.0.0.1:${IPFS_A_API_PORT:-5001}:5001"
+      - "127.0.0.1:${IPFS_A_GATEWAY_PORT:-8080}:8080"
+    volumes:
+      - ipfs-a-data:/data/ipfs
+      - ./ipfs/001-azaad-dev.sh:/container-init.d/001-azaad-dev.sh:ro
+
+  ipfs-b:
+    <<: *ipfs
+    ports:
+      - "127.0.0.1:${IPFS_B_API_PORT:-5002}:5001"
+      - "127.0.0.1:${IPFS_B_GATEWAY_PORT:-8081}:8080"
+    volumes:
+      - ipfs-b-data:/data/ipfs
+      - ./ipfs/001-azaad-dev.sh:/container-init.d/001-azaad-dev.sh:ro
+
+  # Peers ipfs-a and ipfs-b and keeps them peered (healthy once peered).
+  ipfs-peering:
+    image: ipfs/kubo:v0.38.1
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/peering.sh"]
+    volumes: ["./ipfs/peering.sh:/peering.sh:ro"]
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/peered"]
+      interval: 30s
+      start_period: 60s
+      start_interval: 1s
+      timeout: 3s
+      retries: 2
+    depends_on:
+      ipfs-a: { condition: service_healthy }
+      ipfs-b: { condition: service_healthy }
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    labels:
+      org.azaadawaaz.warning: "DEV ONLY CREDENTIALS (azaad/azaad). Never use outside a local machine."
+    environment:
+      # DEV ONLY. Production uses docker secrets (infra/prod).
+      POSTGRES_DB: ${POSTGRES_DB:-azaadawaaz}
+      POSTGRES_USER: ${POSTGRES_USER:-azaad}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-azaad}
+    # No connection logging (client addresses), only errors.
+    command: ["postgres", "-c", "log_connections=off", "-c", "log_disconnections=off", "-c", "log_hostname=off"]
+    ports: ["127.0.0.1:${POSTGRES_PORT:-5432}:5432"]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/001-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  arlocal:
+    image: textury/arlocal:v1.1.66
+    restart: unless-stopped
+    # --hidelogs: ArLocal's request log includes client addresses (spec §12).
+    # --persist keeps the chain in the volume, consistent with relays and IPFS.
+    # Runs as root only so it can write to the fresh named volume.
+    user: "0:0"
+    command: ["node", "bin/index.js", "1984", "--hidelogs", "--persist", "--dbpath", "data"]
+    ports: ["127.0.0.1:${ARLOCAL_PORT:-1984}:1984"]
+    volumes: ["arlocal-data:/arlocal/data"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:1984/info"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Receipt chain 1 (stands in for Base, decisions.md D7).
+  anvil:
+    <<: *anvil
+    command: ["--host", "0.0.0.0", "--port", "8545", "--chain-id", "31337",
+              "--state", "/home/foundry/state/anvil.json", "--state-interval", "30"]
+    ports: ["127.0.0.1:${ANVIL_PORT:-8545}:8545"]
+    volumes: ["anvil-state:/home/foundry/state"]
+
+  # Receipt chain 2 (stands in for BNB Smart Chain testnet id 97, D7).
+  anvil-bsc:
+    <<: *anvil
+    command: ["--host", "0.0.0.0", "--port", "8545", "--chain-id", "97",
+              "--state", "/home/foundry/state/anvil.json", "--state-interval", "30"]
+    ports: ["127.0.0.1:${ANVIL_BSC_PORT:-8546}:8545"]
+    volumes: ["anvil-bsc-state:/home/foundry/state"]
+
+volumes:
+  relay-a-db:
+  relay-b-db:
+  ipfs-a-data:
+  ipfs-b-data:
+  postgres-data:
+  arlocal-data:
+  anvil-state:
+  anvil-bsc-state:
