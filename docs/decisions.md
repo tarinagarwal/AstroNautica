@@ -38,7 +38,7 @@ pnpm workspaces, TypeScript (strict, ESM), Vitest for tests. Node 22.
 
 ## D9. Crypto libraries
 `@noble/curves` and `@noble/hashes` (audited, pure JS, work in browsers, React Native and Node) for Schnorr signatures
-and hashing; `nostr-tools` for NIP-19 encoding and Nostr event handling; `canonicalize` for RFC 8785 JCS.
+and hashing; `nostr-tools` for NIP-19 encoding and Nostr event handling; RFC 8785 JCS is implemented in `packages/schema` (small, tested against the RFC vectors). Metadata validation is hand-written instead of Ajv, because Ajv compiles schemas with `new Function`, which a strict CSP forbids.
 
 ## D10. Arweave uploads with arweave-js directly
 Spec §6 step 4 offered a bundling service (ArDrive Turbo) or arweave-js. arweave-js works unchanged against ArLocal
