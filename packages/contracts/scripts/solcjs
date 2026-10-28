@@ -1,0 +1,3 @@
+#!/bin/sh
+# Use the npm build of solc (solcjs) when binaries.soliditylang.org is unreachable. See README "Offline builds".
+exec node "$(dirname "$0")/solcjs-wrapper.cjs" "$@"

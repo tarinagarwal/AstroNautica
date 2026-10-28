@@ -80,7 +80,8 @@ class Validator {
     this.check(isUuidv7(m.id), "id must be a UUIDv7");
     this.check(Number.isInteger(m.version) && m.version >= 1, "version must be an integer ≥ 1");
     if (m.version === 1) this.check(m.supersedes === null, "version 1 must have supersedes = null");
-    else this.check(isSha256Hex(m.supersedes), "versions after 1 must set supersedes to the previous manifest's sha256");
+    else
+      this.check(isSha256Hex(m.supersedes), "versions after 1 must set supersedes to the previous manifest's sha256");
 
     const lang = m.language;
     if (!this.check(lang === "en" || lang === "hi" || lang === "both", "language must be en, hi or both")) return true;
@@ -183,11 +184,18 @@ class Validator {
       const s = t![k];
       if (s === undefined) continue;
       this.check(typeof s === "string" && s.trim().length > 0, `${at}.${k} must be non-empty text`);
-      this.check(typeof s !== "string" || [...s].length <= maxChars, `${at}.${k} is longer than ${maxChars} characters`);
+      this.check(
+        typeof s !== "string" || [...s].length <= maxChars,
+        `${at}.${k} is longer than ${maxChars} characters`,
+      );
       if (!need.includes(k)) this.errors.push(`${at}.${k} is not allowed in a "${lang}" story`);
     }
     if (strict) for (const k of need) this.check(t![k] !== undefined, `${at}.${k} is required`);
-    else this.check(need.some((k) => t![k] !== undefined), `${at} needs text in ${need.join(" or ")}`);
+    else
+      this.check(
+        need.some((k) => t![k] !== undefined),
+        `${at} needs text in ${need.join(" or ")}`,
+      );
   }
 }
 

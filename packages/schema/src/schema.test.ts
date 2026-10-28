@@ -25,7 +25,7 @@ describe("JCS (RFC 8785)", () => {
       "1": "One",
       "😀": "Emoji: Grinning Face",
       "\u0080": "Control",
-      "ö": "Latin Small Letter O With Diaeresis",
+      ö: "Latin Small Letter O With Diaeresis",
     };
     expect(canonicalize(input)).toBe(
       '{"\\r":"Carriage Return","1":"One","\u0080":"Control","ö":"Latin Small Letter O With Diaeresis",' +
@@ -34,6 +34,7 @@ describe("JCS (RFC 8785)", () => {
   });
 
   it("serialises numbers like ECMAScript", () => {
+    // eslint-disable-next-line no-loss-of-precision -- RFC 8785 test vector
     expect(canonicalize([333333333.33333329, 1e30, 4.5, 2e-3, 0.000001, 1e21, -0])).toBe(
       "[333333333.3333333,1e+30,4.5,0.002,0.000001,1e+21,0]",
     );

@@ -1,0 +1,35 @@
+{
+  "name": "@azaadawaaz/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./abi/AzaadAwaazRegistry.json": "./abi/AzaadAwaazRegistry.json"
+  },
+  "files": [
+    "dist",
+    "abi"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "forge test",
+    "forge:build": "forge build",
+    "abi": "forge build && node scripts/export-abi.mjs",
+    "abi:check": "forge build && node scripts/export-abi.mjs --check",
+    "fmt": "forge fmt",
+    "fmt:check": "forge fmt --check",
+    "snapshot": "forge snapshot --no-match-test 'testFuzz|invariant'",
+    "snapshot:check": "forge snapshot --check --no-match-test 'testFuzz|invariant'",
+    "deploy:local": "./deploy-local.sh"
+  },
+  "devDependencies": {
+    "solc": "0.8.28"
+  }
+}

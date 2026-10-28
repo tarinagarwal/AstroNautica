@@ -1,0 +1,10 @@
+dist
+node_modules
+pnpm-lock.yaml
+packages/contracts/lib
+packages/contracts/out
+packages/contracts/cache
+*.md
+packages/contracts/src/abi.ts
+packages/contracts/abi
+infra/**/data
