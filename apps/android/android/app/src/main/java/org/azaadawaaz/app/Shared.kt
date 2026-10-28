@@ -21,6 +21,7 @@ object Shared {
   val io = Executors.newCachedThreadPool { r -> Thread(r, "azaad-io").apply { isDaemon = true } }
 
   @Volatile var pendingIntent: Map<String, String>? = null
+  @Volatile var onIntent: (() -> Unit)? = null
 
   lateinit var appContext: Context
 }
