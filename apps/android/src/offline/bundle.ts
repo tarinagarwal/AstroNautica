@@ -12,10 +12,12 @@
  */
 import {
   buildEffectiveLists,
+  observeListEntries,
   parseStorageReceipt,
   selectStories,
   verifyManifest,
   type EffectiveLists,
+  type FirstSeen,
   type Event,
   type ManifestCheck,
   type StorageReceipt,
@@ -156,7 +158,7 @@ export async function importBundle(
   fs: FileSystem,
   zipPath: string,
   destDir: string,
-  trust: { ownerPubkey: string; knownListEvents: Event[]; now?: number },
+  trust: { ownerPubkey: string; knownListEvents: Event[]; now?: number; firstSeen?: FirstSeen },
 ): Promise<VerifiedBundle> {
   await fs.remove(destDir).catch(() => undefined);
   await fs.mkdirs(destDir);
@@ -182,7 +184,10 @@ export async function importBundle(
 
   // Signatures: only list events that chain to the pinned owner key count; the story must be signed by a publisher
   // key valid at its time.
-  const lists = buildEffectiveLists(trust.ownerPubkey, [...trust.knownListEvents, ...events.lists], { now: trust.now });
+  const all = [...trust.knownListEvents, ...events.lists];
+  const firstSeen: FirstSeen = new Map(trust.firstSeen ?? []);
+  observeListEntries(all, firstSeen, trust.now);
+  const lists = buildEffectiveLists(trust.ownerPubkey, all, { now: trust.now, firstSeen });
   const [ref] = selectStories([events.story], lists, { includeUnlisted: true });
   if (!ref) throw new BundleError("bundle.error.signature", "the story is not signed by a valid publisher key");
   if (ref.storyId !== index.storyId || ref.version !== index.version)

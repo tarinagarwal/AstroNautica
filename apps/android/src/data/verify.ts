@@ -58,7 +58,7 @@ export async function verifyStory(
     onUpdate(r);
   };
 
-  const eventOk = verifyEventStrict(ref.event) && !!app.lists && wasPublisherAt(app.lists, ref.publisher, ref.createdAt);
+  const eventOk = verifyEventStrict(ref.event) && !!app.lists && wasPublisherAt(app.lists, ref.publisher, ref.createdAt, ref.manifestSha256);
   update({ event: { state: eventOk ? "ok" : "fail" } });
 
   const tasks: Promise<void>[] = [];
@@ -121,9 +121,9 @@ export async function verifyStory(
   tasks.push(
     (async () => {
       const chains = app.config.chains;
-      if (!chains.length) return update({ chains: { state: "fail", receipts: [], error: "no-chains" } });
+      if (!chains.length || !app.lists) return update({ chains: { state: "fail", receipts: [], error: "no-chains" } });
       const receipts = await Promise.all(
-        chains.map((c) => checkChainReceipt(http, c, ref.storyId, ref.version, ref.manifestSha256)),
+        chains.map((c) => checkChainReceipt(http, c, ref.storyId, ref.version, ref.manifestSha256, app.lists!)),
       );
       update({ chains: { state: receipts.every((x) => x.ok) ? "ok" : "fail", receipts } });
     })(),

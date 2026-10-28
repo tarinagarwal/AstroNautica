@@ -31,25 +31,6 @@ export const registryAbi = [
   },
   {
     "type": "function",
-    "name": "latestVersion",
-    "inputs": [
-      {
-        "name": "storyId",
-        "type": "bytes16",
-        "internalType": "bytes16"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint32",
-        "internalType": "uint32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "owner",
     "inputs": [],
     "outputs": [
@@ -115,6 +96,11 @@ export const registryAbi = [
         "name": "version",
         "type": "uint32",
         "internalType": "uint32"
+      },
+      {
+        "name": "by",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [
@@ -157,8 +143,14 @@ export const registryAbi = [
       {
         "name": "version",
         "type": "uint32",
-        "indexed": false,
+        "indexed": true,
         "internalType": "uint32"
+      },
+      {
+        "name": "publisher",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
       },
       {
         "name": "manifestSha256",
@@ -213,6 +205,11 @@ export const registryAbi = [
         "name": "version",
         "type": "uint32",
         "internalType": "uint32"
+      },
+      {
+        "name": "publisher",
+        "type": "address",
+        "internalType": "address"
       }
     ]
   },
@@ -266,27 +263,6 @@ export const registryAbi = [
         "name": "caller",
         "type": "address",
         "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "VersionNotIncreasing",
-    "inputs": [
-      {
-        "name": "storyId",
-        "type": "bytes16",
-        "internalType": "bytes16"
-      },
-      {
-        "name": "latest",
-        "type": "uint32",
-        "internalType": "uint32"
-      },
-      {
-        "name": "given",
-        "type": "uint32",
-        "internalType": "uint32"
       }
     ]
   },

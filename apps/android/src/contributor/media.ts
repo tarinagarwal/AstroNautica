@@ -3,9 +3,9 @@
  * draft, and "metadata removed ✓" is shown only after the output was re-read and media-strip's `findMetadata`
  * returned nothing at all (the ICC profile is dropped too, so the list is truly empty).
  *
- * Images: HEIC/AVIF/GIF (and photos whose Exif orientation is not upright, since stripping removes the orientation
- * tag) are first decoded and re-encoded as JPEG natively, which writes no metadata; then media-strip strips the
- * bytes. Videos are stripped in place without re-encoding through the skeleton planner (bmffSkeleton.ts).
+ * Images: JPEGs (whose camera quantisation tables can fingerprint the device), HEIC/AVIF/GIF, and photos whose Exif
+ * orientation is not upright are first decoded and re-encoded as JPEG by the platform encoder (quality 92), which
+ * writes no metadata; then media-strip strips the bytes. Videos are stripped in place without re-encoding through the skeleton planner (bmffSkeleton.ts).
  */
 import { detectMime, findMetadata, readJpegOrientation, stripMetadata, STRIPPABLE_MIMES } from "@azaadawaaz/media-strip";
 import { sha256Hex } from "@azaadawaaz/schema";
@@ -63,7 +63,9 @@ export async function prepareImage(
       removed = ["unreadable-metadata"];
     }
     let wasConverted = false;
-    if (!mime || !IMAGE_OUT.includes(mime) || orientationOf(bytes, mime) !== 1) {
+    // JPEGs are always re-encoded by the platform encoder: a camera's quantisation tables can identify the device
+    // even with every metadata segment removed. PNG/WebP are stripped losslessly unless rotated.
+    if (!mime || !IMAGE_OUT.includes(mime) || mime === "image/jpeg" || orientationOf(bytes, mime) !== 1) {
       await tools.imageToJpeg(input, converted, 92);
       bytes = await fs.readBytes(converted);
       mime = detectMime(bytes);

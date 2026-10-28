@@ -24,11 +24,14 @@ COPY entrypoint.sh /app/azaad-entrypoint.sh
 RUN chmod 0755 /app/azaad-policy.js /app/scrub-ips.js /app/azaad-entrypoint.sh \
  && rm -f /app/write-policy.py
 
-# Policy defaults (spec §7); override per deployment.
+# Policy defaults (spec §7); override per deployment. OWNER_PUBKEY (hex or
+# npub) has no default: without it the plugin runs in open dev mode (see
+# policy.js). The learned moderator/publisher state lives in the DB volume.
 ENV POW_DIFFICULTY=16 \
     RATE_COMMENTS_PER_MINUTE=10 \
     RATE_REACTIONS_PER_MINUTE=60 \
-    MAX_COMMENT_CHARS=2000
+    MAX_COMMENT_CHARS=2000 \
+    POLICY_STATE_FILE=/app/strfry-db/policy-state.json
 
 EXPOSE 7777
 WORKDIR /app

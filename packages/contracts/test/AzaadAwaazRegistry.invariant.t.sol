@@ -4,39 +4,58 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {AzaadAwaazRegistry} from "../src/AzaadAwaazRegistry.sol";
 
-/// Drives the registry with random publish attempts and keeps a ghost model of what must be stored.
+/// Drives the registry with random publish attempts from several keys and random publisher rotations, and keeps a
+/// ghost model of what must be stored per (storyId, version, publisher).
 contract RegistryHandler is Test {
     AzaadAwaazRegistry public registry;
-    address public publisher;
+    address public owner;
 
     bytes16[3] public stories = [bytes16(uint128(1)), bytes16(uint128(2)), bytes16(uint128(3))];
-    mapping(bytes16 => uint32) public ghostLatest;
-    mapping(bytes16 => mapping(uint32 => bytes32)) public ghostSha;
-    mapping(bytes16 => mapping(uint32 => uint64)) public ghostTs;
-    mapping(bytes16 => uint32[]) internal _accepted;
+    address[3] public keys;
+    /// Small version domain (0..8, plus 2^32-1) so collisions and the max version are exercised.
+    uint32[10] public versionDomain = [uint32(0), 1, 2, 3, 4, 5, 6, 7, 8, type(uint32).max];
+
+    address public ghostPublisher;
+    mapping(bytes16 => mapping(uint32 => mapping(address => bytes32))) public ghostSha;
+    mapping(bytes16 => mapping(uint32 => mapping(address => uint64))) public ghostTs;
     uint256 public acceptedCount;
+    uint256 public rotations;
+    /// Incremented whenever the contract's accept/reject decision disagrees with the model. Must stay 0.
+    uint256 public mismatches;
 
-    constructor(AzaadAwaazRegistry registry_, address publisher_) {
+    constructor(AzaadAwaazRegistry registry_, address owner_, address[3] memory keys_) {
         registry = registry_;
-        publisher = publisher_;
+        owner = owner_;
+        keys = keys_;
+        ghostPublisher = keys_[0];
     }
 
-    function accepted(bytes16 storyId) external view returns (uint32[] memory) {
-        return _accepted[storyId];
-    }
-
-    function publish(uint8 storySeed, uint32 versionSeed, bytes32 sha, uint32 timeJump) external {
+    function publish(uint8 keySeed, uint8 storySeed, uint8 versionSeed, bytes32 sha, uint32 timeJump) external {
+        address caller = keys[keySeed % 3];
         bytes16 storyId = stories[storySeed % 3];
-        uint32 version = uint32(bound(versionSeed, 0, 30));
+        uint32 version = versionDomain[versionSeed % 10];
         vm.warp(block.timestamp + bound(timeJump, 0, 7 days));
-        vm.prank(publisher);
+
+        bool expectOk = caller == ghostPublisher && version != 0 && sha != bytes32(0)
+            && ghostSha[storyId][version][caller] == bytes32(0);
+
+        vm.prank(caller);
         try registry.publish(storyId, version, sha, "bafy") {
-            ghostLatest[storyId] = version;
-            ghostSha[storyId][version] = sha;
-            ghostTs[storyId][version] = uint64(block.timestamp);
-            _accepted[storyId].push(version);
+            if (!expectOk) mismatches++;
+            ghostSha[storyId][version][caller] = sha;
+            ghostTs[storyId][version][caller] = uint64(block.timestamp);
             acceptedCount++;
-        } catch {}
+        } catch {
+            if (expectOk) mismatches++;
+        }
+    }
+
+    function rotate(uint8 keySeed) external {
+        address next = keys[keySeed % 3];
+        vm.prank(owner);
+        registry.setPublisher(next);
+        ghostPublisher = next;
+        rotations++;
     }
 }
 
@@ -44,32 +63,45 @@ contract AzaadAwaazRegistryInvariantTest is Test {
     AzaadAwaazRegistry internal registry;
     RegistryHandler internal handler;
     address internal owner = makeAddr("owner");
-    address internal publisher = makeAddr("publisher");
+    address[3] internal keys = [makeAddr("keyA"), makeAddr("keyB"), makeAddr("keyC")];
 
     function setUp() public {
-        registry = new AzaadAwaazRegistry(owner, publisher);
-        handler = new RegistryHandler(registry, publisher);
+        registry = new AzaadAwaazRegistry(owner, keys[0]);
+        handler = new RegistryHandler(registry, owner, keys);
         targetContract(address(handler));
     }
 
+    /// Every (story, version, key) in the domain reads exactly what the model says, and the number of stored
+    /// receipts equals the number of accepted publishes (nothing overwritten, nothing deleted).
     function invariant_StateMatchesModel() public view {
+        uint256 stored = 0;
         for (uint256 s = 0; s < 3; s++) {
             bytes16 storyId = handler.stories(s);
-            assertEq(registry.latestVersion(storyId), handler.ghostLatest(storyId));
-            uint32[] memory versions = handler.accepted(storyId);
-            for (uint256 i = 0; i < versions.length; i++) {
-                if (i > 0) assertGt(versions[i], versions[i - 1]);
-                (bytes32 sha, uint64 ts) = registry.receipt(storyId, versions[i]);
-                assertEq(sha, handler.ghostSha(storyId, versions[i]));
-                assertEq(ts, handler.ghostTs(storyId, versions[i]));
-                assertTrue(sha != bytes32(0));
+            for (uint256 v = 0; v < 10; v++) {
+                uint32 version = handler.versionDomain(v);
+                for (uint256 k = 0; k < 3; k++) {
+                    address by = keys[k];
+                    (bytes32 sha, uint64 ts) = registry.receipt(storyId, version, by);
+                    assertEq(sha, handler.ghostSha(storyId, version, by));
+                    assertEq(ts, handler.ghostTs(storyId, version, by));
+                    if (version == 0) assertEq(sha, bytes32(0));
+                    if (sha != bytes32(0)) {
+                        assertGt(ts, 0);
+                        stored++;
+                    }
+                }
             }
         }
+        assertEq(stored, handler.acceptedCount());
     }
 
-    function invariant_OwnerAndPublisherUnchanged() public view {
+    function invariant_DecisionsMatchModel() public view {
+        assertEq(handler.mismatches(), 0);
+    }
+
+    function invariant_OwnerFixed_PublisherTracked_NoFunds() public view {
         assertEq(registry.owner(), owner);
-        assertEq(registry.publisher(), publisher);
+        assertEq(registry.publisher(), handler.ghostPublisher());
         assertEq(address(registry).balance, 0);
     }
 }

@@ -6,19 +6,45 @@ Smart Chain (decisions D7).
 
 The contract is small and cannot be changed after deployment:
 
-- There is no proxy, no `selfdestruct`, no payable function, and no way to delete or edit a receipt.
+- There is no proxy, no `selfdestruct`, no payable function, and no way to delete or edit a receipt. Plain ETH
+  transfers and unknown selectors revert.
 - `owner` is set in the constructor and can never be transferred. Its only power is `setPublisher(next)`.
 - `publisher` is the only address that can call `publish`.
+- Receipts are stored **per publisher address**: the key is `(storyId, version, publisher)`.
 - Rules for `publish`:
   - `storyId` must not be zero.
-  - `version` must be at least 1 and strictly greater than `latestVersion(storyId)`, so each `(storyId, version)` pair
-    is written at most once.
+  - `version` must be at least 1. There is no ordering between versions: any version can be written at any time.
   - `manifestSha256` must not be zero.
-  - `manifestCid` must be 1 to 128 bytes long.
-- Reads: `receipt(storyId, version)` returns `(manifestSha256, timestamp)` and `latestVersion(storyId)` returns the
-  latest version. Both return zeros for anything never published.
+  - `manifestCid` must be 1 to `MAX_CID_LENGTH` (128) bytes long.
+  - Each `(storyId, version, publisher)` triple can be written once. A second write reverts with
+    `AlreadyPublished(storyId, version, publisher)`.
+- Reads: `receipt(storyId, version, by)` returns `(manifestSha256, timestamp)` for the receipt that address `by`
+  wrote. It returns zeros for anything never published.
+- Events: `Published(storyId, version, publisher, manifestSha256, manifestCid, timestamp)` with `storyId`, `version`
+  and `publisher` indexed, and `PublisherChanged(oldPublisher, newPublisher)` (also emitted by the constructor with
+  `oldPublisher = 0`).
 - Errors are custom errors: `NotOwner`, `NotPublisher`, `ZeroAddress`, `InvalidStoryId`, `InvalidVersion`,
-  `AlreadyPublished`, `VersionNotIncreasing`, `EmptyManifestHash`, `EmptyManifestCid` and `ManifestCidTooLong`.
+  `AlreadyPublished`, `EmptyManifestHash`, `EmptyManifestCid` and `ManifestCidTooLong`.
+
+### Why receipts are per publisher, and when to trust one
+
+An earlier design kept one receipt per `(storyId, version)` and required versions to strictly increase. A compromised
+publisher key could then block every future correction of a story by publishing version `2^32-1`, or squat the next
+version with a wrong hash so the real publisher's receipt could never be written. Receipts also did not record who
+wrote them, so after a key rotation nobody could tell the compromised key's receipts apart.
+
+Now each publisher key has its own write-once slot for every `(storyId, version)`. After the owner calls
+`setPublisher(next)`, the new key can write its own receipt for any version, including versions the old key already
+wrote, and the old key can write nothing more. Nothing the old key wrote is deleted; it stays readable under the old
+address.
+
+**Client trust rule.** Clients trust `receipt(storyId, version, by)` only if `by` was the publisher address on the
+owner-signed publisher list at the receipt's block timestamp (the `timestamp` the receipt returns). A receipt from any
+other address, or from a key outside the period the list gives it, is ignored even though it exists on chain. The
+on-chain `PublisherChanged` events (only the owner can cause them) show when each key could write, but they cannot
+show when a key was compromised; the owner-signed list is what marks a compromised key's period as untrusted. A
+consequence: a correction is published under the new key, and clients reading an old version look up the receipt
+written by whichever key the list trusts for that time.
 
 ## Layout
 
@@ -42,7 +68,7 @@ storage, so the same bytecode runs on any EVM chain we add later. The optimizer 
 ```sh
 cd packages/contracts
 forge build
-forge test -vv                 # 49 tests: unit, fuzz (1024 runs), invariants
+forge test -vv                 # 56 tests: 46 unit, 7 fuzz (1024 runs), 3 invariants
 forge fmt --check
 forge snapshot --check --no-match-test 'testFuzz|invariant'   # gas regression check
 FOUNDRY_PROFILE=ci forge test  # 10,000 fuzz runs
@@ -52,8 +78,8 @@ From the monorepo root, `pnpm --filter @azaadawaaz/contracts test` runs `forge t
 
 Gas measured by `vm.snapshotGasLastCall` (in `snapshots/`):
 
-- First version of a story: about 73k gas.
-- A correction (a new version of an existing story): about 49k gas.
+- A receipt (first version of a story): about 51k gas.
+- A correction (another version of the same story, same publisher): about 49k gas.
 - `setPublisher`: about 7k gas.
 
 These numbers leave out the 21k base transaction cost and calldata.
@@ -69,8 +95,10 @@ const [sha, ts] = await client.readContract({
   address: "0x…",
   abi: registryAbi,
   functionName: "receipt",
-  args: ["0x0192f0c1a2b34c5d8e9f00112233aabb", 1],
+  // (storyId, version, publisher address that wrote the receipt)
+  args: ["0x0192f0c1a2b34c5d8e9f00112233aabb", 1, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"],
 });
+// Trust (sha, ts) only if that address was the owner-approved publisher at ts.
 ```
 
 `chains` covers Base (8453), Base Sepolia (84532), BNB Smart Chain (56), BSC testnet (97) and local anvil (31337). Each
@@ -104,8 +132,10 @@ PUB_KEY=0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d   # a
 cast send $ADDR "publish(bytes16,uint32,bytes32,string)" \
   0x0192f0c1a2b34c5d8e9f00112233aabb 1 0x$(printf manifest | sha256sum | cut -d' ' -f1) \
   bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi --private-key $PUB_KEY
-cast logs --from-block 0 --address $ADDR "Published(bytes16 indexed,uint32,bytes32,string,uint64)"
-cast call $ADDR "receipt(bytes16,uint32)(bytes32,uint64)" 0x0192f0c1a2b34c5d8e9f00112233aabb 1
+cast logs --from-block 0 --address $ADDR \
+  "Published(bytes16 indexed,uint32 indexed,address indexed,bytes32,string,uint64)"
+cast call $ADDR "receipt(bytes16,uint32,address)(bytes32,uint64)" \
+  0x0192f0c1a2b34c5d8e9f00112233aabb 1 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
 ```
 
 ## Deploy to Base and BNB Smart Chain

@@ -43,6 +43,7 @@ export type DraftBlock =
 
 export interface Draft {
   localId: string;
+  /** Empty until the first submission: the UUIDv7 is generated then, so it doesn't reveal when writing began. */
   storyId: string;
   version: number;
   /** Previous manifest sha256 when this is a correction (version > 1). */
@@ -78,10 +79,15 @@ export const DEFAULT_DISPLAY_NAME = "AzaadAwaaz contributor";
 let blockCounter = 0;
 export const newBlockId = () => `b${Date.now().toString(36)}${(blockCounter++).toString(36)}`;
 
+/** Give the draft its story id at the moment of its first submission (corrections and resubmissions keep theirs). */
+export function withStoryId(d: Draft, now = Date.now()): Draft {
+  return d.storyId ? d : { ...d, storyId: uuidv7(now) };
+}
+
 export function newDraft(language: StoryLanguage = "en", now = Date.now()): Draft {
   return {
     localId: `d${now.toString(36)}${Math.random().toString(36).slice(2, 8)}`,
-    storyId: uuidv7(now),
+    storyId: "",
     version: 1,
     supersedes: null,
     language,
@@ -193,7 +199,7 @@ const VIDEO_MIMES = ["video/mp4", "video/quicktime"];
 /** Everything that must be fixed before the draft can be submitted. Empty means ready. */
 export function validateDraft(d: Draft, contributorNpub: string, limits: MediaLimits = DEFAULT_MEDIA_LIMITS): DraftProblem[] {
   const problems: DraftProblem[] = [];
-  if (!isUuidv7(d.storyId)) problems.push({ key: "editor.problem.storyId" });
+  if (d.storyId && !isUuidv7(d.storyId)) problems.push({ key: "editor.problem.storyId" });
   if (d.blocks.length === 0) problems.push({ key: "editor.problem.noBlocks" });
   if (d.blocks.length > limits.maxBlocks) problems.push({ key: "editor.problem.tooManyBlocks", vars: { max: limits.maxBlocks } });
   const allMedia: StrippedMedia[] = [];
@@ -217,7 +223,8 @@ export function validateDraft(d: Draft, contributorNpub: string, limits: MediaLi
     const max = isVideo ? limits.maxVideoBytes : limits.maxImageBytes;
     if (m.size > max) problems.push({ key: "editor.problem.tooLarge", vars: { mb: Math.round(max / 1024 / 1024) } });
   }
-  const v = validateApprovalBody(toApprovalBody(d, contributorNpub));
+  // Validate with a placeholder id when none has been assigned yet (it is generated at submission).
+  const v = validateApprovalBody(toApprovalBody(d.storyId ? d : { ...d, storyId: uuidv7() }, contributorNpub));
   if (!v.ok) for (const e of v.errors) problems.push({ key: "editor.problem.schema", detail: e });
   return problems;
 }

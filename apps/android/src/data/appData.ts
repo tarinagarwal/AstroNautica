@@ -9,6 +9,7 @@ import {
   MODERATOR_LISTS,
   OWNER_LISTS,
   buildEffectiveLists,
+  observeListEntries,
   listD,
   parseStorageReceipt,
   selectStories,
@@ -16,6 +17,7 @@ import {
   verifyEventStrict,
   verifyManifest,
   type EffectiveLists,
+  type FirstSeen,
   type Event,
   type Filter,
   type ManifestCheck,
@@ -58,6 +60,9 @@ export class AppData {
   private subs: (() => void)[] = [];
   private subKey = "";
   private readonly manifests = new Map<string, Promise<LoadedManifest>>();
+  /** When this device first saw each moderator-list entry (persisted; feeds the daily caps, decision D18). */
+  readonly firstSeen: FirstSeen = new Map();
+  private firstSeenSize = 0;
 
   constructor(
     readonly config: AppConfig,
@@ -110,7 +115,13 @@ export class AppData {
       this.listsStatus = "none";
       return;
     }
-    this.lists = buildEffectiveLists(this.owner, [...this.listEvents.values()]);
+    const events = [...this.listEvents.values()];
+    observeListEntries(events, this.firstSeen);
+    if (this.firstSeen.size !== this.firstSeenSize) {
+      this.firstSeenSize = this.firstSeen.size;
+      void this.store.set("lists:firstSeen", [...this.firstSeen]);
+    }
+    this.lists = buildEffectiveLists(this.owner, events, { firstSeen: this.firstSeen });
     this.gateways.setGateways(this.lists.gateways);
     const hasOwnerLists =
       this.lists.relays.length > 0 || this.lists.gateways.length > 0 || this.lists.moderators.length > 0;
@@ -120,6 +131,8 @@ export class AppData {
 
   /** Load bundled and cached data (no network). */
   async init(): Promise<void> {
+    for (const [k, v] of (await this.store.get<[string, number][]>("lists:firstSeen")) ?? []) this.firstSeen.set(k, v);
+    this.firstSeenSize = this.firstSeen.size;
     this.addListEvents(this.config.listEvents);
     this.addListEvents((await this.store.get<Event[]>("lists:events")) ?? []);
     for (const e of (await this.store.get<Event[]>("stories:events")) ?? []) this.storyEvents.set(e.id, e);

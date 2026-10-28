@@ -69,6 +69,9 @@ services:
     image: azaadawaaz/relay:mirror
     logging: { driver: none }
     environment:
+      # Write policy allowlist: stories, lists and audit events only from the
+      # owner and the moderators/publisher keys the owner's lists name.
+      OWNER_PUBKEY: ${OWNER_PUBKEY:?set OWNER_PUBKEY (owner npub or hex) in .env}
       POW_DIFFICULTY: ${POW_DIFFICULTY:-16}
       RATE_COMMENTS_PER_MINUTE: ${RATE_COMMENTS_PER_MINUTE:-10}
       RATE_REACTIONS_PER_MINUTE: ${RATE_REACTIONS_PER_MINUTE:-60}

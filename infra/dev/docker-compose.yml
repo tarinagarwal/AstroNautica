@@ -22,6 +22,14 @@ x-relay: &relay
   image: azaadawaaz/relay:dev
   restart: unless-stopped
   environment:
+    # The pinned owner key (hex or npub): stories, lists and audit events are
+    # accepted only from it and the moderators/publishers its lists name. The
+    # dev owner key is `ownerPubkey` in .dev/config.json (written by
+    # scripts/dev-setup.mjs); export it before `up`:
+    #   export OWNER_PUBKEY=$(node -p 'require("./.dev/config.json").ownerPubkey')
+    # Left empty (first run, before dev-setup), the relays run in OPEN DEV MODE
+    # and accept those kinds from any key (deletions stay rejected, PoW stays on).
+    OWNER_PUBKEY: ${OWNER_PUBKEY:-}
     POW_DIFFICULTY: ${POW_DIFFICULTY:-16}
     RATE_COMMENTS_PER_MINUTE: ${RATE_COMMENTS_PER_MINUTE:-10}
     RATE_REACTIONS_PER_MINUTE: ${RATE_REACTIONS_PER_MINUTE:-60}

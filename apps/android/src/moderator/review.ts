@@ -17,7 +17,7 @@ import { approvalBodySha256, mediaHashes, validateApprovalBody, type Approval, t
 import { getPublicKey } from "nostr-tools/pure";
 import type { Api, ApiConfig, SubmissionDetail } from "../api/client";
 import { encryptFeedback } from "../contributor/submissions";
-import { createAuditEvent } from "./actions";
+import { createAuditEvent } from "@azaadawaaz/core";
 
 export interface ModeratorIdentity {
   secretKey: Uint8Array;
@@ -80,10 +80,7 @@ export async function approve(
   if (opened.problems.length) throw new Error(`cannot approve: ${opened.problems.join("; ")}`);
   const approval = signApproval(opened.body, me.secretKey, approvedAt);
   const publisherWrappedKey = await wrapKey(opened.contentKey, publisherKey(lists, config));
-  const auditEvent = createAuditEvent(me.secretKey, "approve", {
-    submissionId: opened.detail.id,
-    storyId: opened.detail.storyId,
-  });
+  const auditEvent = createAuditEvent({ action: "approve", submissionId: opened.detail.id, storyId: opened.detail.storyId }, me.secretKey);
   await api.approve(opened.detail.id, {
     approval,
     approvalBodySha256: approvalBodySha256(opened.body),
@@ -93,11 +90,11 @@ export async function approve(
   return approval;
 }
 
-export async function reject(api: Api, detail: SubmissionDetail, me: ModeratorIdentity, reason: string) {
+export async function rejectSubmission(api: Api, detail: SubmissionDetail, me: ModeratorIdentity, reason: string) {
   const text = reason.trim();
   if (!text) throw new Error("a reason is required");
   const feedback = encryptFeedback(text, me.secretKey, detail.contributor);
-  const auditEvent = createAuditEvent(me.secretKey, "reject", { submissionId: detail.id });
+  const auditEvent = createAuditEvent({ action: "reject", submissionId: detail.id }, me.secretKey);
   return api.reject(detail.id, { feedback, auditEvent });
 }
 
@@ -105,12 +102,12 @@ export async function requestChanges(api: Api, detail: SubmissionDetail, me: Mod
   const text = notes.trim();
   if (!text) throw new Error("notes are required");
   const feedback = encryptFeedback(text, me.secretKey, detail.contributor);
-  const auditEvent = createAuditEvent(me.secretKey, "request_changes", { submissionId: detail.id });
+  const auditEvent = createAuditEvent({ action: "request_changes", submissionId: detail.id }, me.secretKey);
   return api.requestChanges(detail.id, { feedback, auditEvent });
 }
 
 export function claim(api: Api, id: string, me: ModeratorIdentity) {
-  return api.claim(id, createAuditEvent(me.secretKey, "claim", { submissionId: id }));
+  return api.claim(id, createAuditEvent({ action: "claim", submissionId: id }, me.secretKey));
 }
 
 /**

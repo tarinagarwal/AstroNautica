@@ -8,6 +8,23 @@ set -eu
 
 mkdir -p /app/strfry-db
 
+# Write policy: learn the owner's moderators and publisher keys before strfry
+# starts (infra/relay/policy.js). Fails here if OWNER_PUBKEY is malformed.
+OWNER_HEX=$(node /app/azaad-policy.js --owner-hex)
+if [ -n "$OWNER_HEX" ]; then
+  # Optional bootstrap: a JSON array of owner list events. `strfry import`
+  # verifies every signature (the plugin itself trusts only what strfry checked).
+  if [ -n "${BOOTSTRAP_LIST_EVENTS_FILE:-}" ]; then
+    node /app/azaad-policy.js --bootstrap-lines "$BOOTSTRAP_LIST_EVENTS_FILE" | /app/strfry import 2>/dev/null
+  fi
+  # Replay the owner's moderators / service-keys lists already in the database
+  # into the policy state file (POLICY_STATE_FILE), so nothing is lost if the
+  # state file is missing or older than the database.
+  /app/strfry scan \
+    "{\"kinds\":[30078],\"authors\":[\"$OWNER_HEX\"],\"#d\":[\"azaad:list:moderators\",\"azaad:list:service-keys\"]}" \
+    2>/dev/null | node /app/azaad-policy.js --ingest -
+fi
+
 # Optional: stream events down from upstream relays. STREAMS is a
 # comma-separated list of full relay URLs (wss://... or ws://...); the mirror
 # kit uses this to follow the official relays.
