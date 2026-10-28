@@ -10,9 +10,9 @@ Updated after every phase. Newest first within each section.
 | – | `packages/contracts` (from phase 3, done early) | **Done**: 49 Foundry tests (unit, fuzz, invariant); deployed and exercised on anvil |
 | 2 | `services/api` | **Done**: 78 integration tests on real Postgres; every transition, auth, invites, uploads, first-approval-wins |
 | 3 | `services/media`, `packages/media-strip`, `services/publisher`, E2E | **Done**: media-strip 55 tests, media 23 tests (real ffmpeg/exiftool media); publisher units; **`scripts/e2e.mjs` 62/62 checks** on the dev network (story published 4 s after approval; Arweave + receipts on both chains verified by a clean client; tamper → red; comments/PoW/hide; changes/reject; unlist + override; one relay/IPFS node/chain down → still readable; rebuild into an empty IPFS node; no IPs in logs) |
-| 4 | `apps/web` | In progress (agent) |
+| 4 | `apps/web` | **Done**: 53 unit + 8 mocked e2e + 1 real-stack browser journey (owner invite → contributor → moderator → published → reader verifies, comments, hide) |
 | 5 | `apps/android` | In progress (agent); Android SDK via Docker image `reactnativecommunity/react-native-android` (dl.google.com is blocked here) |
-| 6 | `infra`, runbooks, rebuild script, threat model | Dev stack done and verified (9 services); prod + mirror compose written; relay PoW/rate-limit policy with tests; threat model, 5 runbooks, owner/ops scripts, rebuild-archive, mirror-sync done. Left: reconcile prod env names with services, CI workflow |
+| 6 | `infra`, runbooks, rebuild script, threat model | **Done** except final pass: dev/prod/mirror compose; relay allowlist policy (44 tests); prod network isolation (ipfsrpc, ipfsgw, mediabus), DB least-privilege users, media worker; mirror-sync exports signed web releases; threat model, runbooks, owner tooling, CI |
 
 ## Decisions taken without the owner (sensible defaults; see docs/decisions.md)
 - D7: receipts on Base **and** BSC (owner asked about BSC).
@@ -26,10 +26,17 @@ cd infra/dev && docker compose up -d --wait && cd ../..
 node scripts/dev-setup.mjs          # sample keys, registry on 2 chains, signed lists → .dev/
 ```
 
+## Security review (done) and fixes
+An independent review found 14 issues (3 high). All fixed, with tests — see decisions D17–D22 and
+`docs/architecture.md` "Deviations → security review fixes": verify-before-dedupe relay pool; retired keys only for
+vouched manifests; per-writer chain receipts; relay allowlist (no deletions); moderator cap hardening; strict schema
+keys + field-by-field manifest; publisher re-proves manifests before signing; isolated media container; verified,
+capped archive/mirror downloads; API quotas, DB replay store, no self-review, DB roles; Kubo RPC isolation; sandboxed
+gateway CSP; owner tooling shows diffs.
+
 ## Next steps
-1. Integrate the web app (agent) and the Android app (agent); web E2E against the real API and publisher.
-2. Reconcile `infra/prod` env names with the services (api: PUBLIC_URL/OWNER_PUBKEY/RELAYS; publisher names in its README).
-3. Security review, fixes, handover.
+1. Android app (agent) integration and verification.
+2. Final full run: e2e, web real-stack journey, all package tests; handover.
 
 ## Owner decisions pending (only the owner can make these)
 See the final handover; collected here as they come up:
