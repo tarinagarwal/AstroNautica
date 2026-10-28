@@ -205,7 +205,8 @@ export function Comments({
   return (
     <section className="comments" aria-labelledby="comments-h" data-testid="comments">
       <h2 id="comments-h">
-        {t("comments.title")} <span className="muted small">({t("comments.count", { count })})</span>
+        {t("comments.title")}{" "}
+        <span className="muted small">({count === 1 ? t("comments.countOne") : t("comments.count", { count })})</span>
       </h2>
       {backup && <BackupPrompt onClose={() => setBackup(false)} />}
       <CommentForm story={story} post={post} onDone={onPosted} />

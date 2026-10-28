@@ -18,7 +18,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import { toPubkeyHex } from "@azaadawaaz/core";
+import { GatewayScoreboard, toPubkeyHex } from "@azaadawaaz/core";
 import { fetchVerifiedCar, importCarInto, pinCid, rebuildArchive } from "@azaadawaaz/scripts/archive";
 
 const env = process.env;
@@ -50,6 +50,8 @@ if (!/^[0-9a-f]{64}$/.test(cfg.owner) || cfg.relays.length === 0) {
 }
 mkdirSync(cfg.stateDir, { recursive: true });
 const statePath = join(cfg.stateDir, "lists.json");
+// Kept across sync runs, so a gateway that served bad or oversized data stays at the back of the queue.
+const board = new GatewayScoreboard();
 
 async function kubo(path, init = {}) {
   const res = await fetch(`${cfg.ipfsApi}/api/v0/${path}`, {
@@ -86,7 +88,7 @@ async function syncWeb(lists) {
   if (!existsSync(target)) {
     // Get the release as a verified CAR from the gateways (every block hash-checked, DAG complete), import it into
     // the local node and pin it. This does not depend on the local node finding peers.
-    const { blocks } = await fetchVerifiedCar(web.cid, cfg.gateways);
+    const { blocks } = await fetchVerifiedCar(web.cid, cfg.gateways, board);
     await importCarInto(blocks, cfg.ipfsApi);
     await pinCid(web.cid, cfg.ipfsApi);
     const tmp = `${target}.tmp`;
@@ -123,6 +125,7 @@ async function syncOnce() {
     republishTo: [cfg.localRelay],
     includeSocial: true,
     extraListEvents: previous,
+    board,
   });
   const { lists, ...summary } = report;
   if (lists.sourceEvents.length) writeFileSync(statePath, JSON.stringify(lists.sourceEvents));

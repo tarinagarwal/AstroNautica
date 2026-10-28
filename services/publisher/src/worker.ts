@@ -1,5 +1,5 @@
 import type { PublisherDb } from "./db.js";
-import type { Pipeline } from "./pipeline.js";
+import { PolicyError, type Pipeline } from "./pipeline.js";
 
 /** Poll for due jobs and run them; failures are retried with backoff by `failJob`. */
 export class Worker {
@@ -20,6 +20,10 @@ export class Worker {
       await this.pipeline.run(job);
       this.opts.log("job done", { submission: job.submission_id });
     } catch (e) {
+      if (e instanceof PolicyError) {
+        this.opts.log("job blocked", { submission: job.submission_id, reason: e.message });
+        return true;
+      }
       const attempts = job.attempts + 1;
       const next = await this.db.failJob(job.submission_id, attempts);
       this.opts.log("job failed; will retry", { submission: job.submission_id, attempts, next, error: String(e) });

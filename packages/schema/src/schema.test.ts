@@ -164,6 +164,28 @@ describe("validation", () => {
     expect(validateManifest(sampleManifest({ supersedes: H("1") })).ok).toBe(false);
   });
 
+  it("rejects fields a moderator never saw, at every level", () => {
+    const m = sampleManifest();
+    const withExtra = (f: (x: any) => void) => {
+      const c: any = structuredClone(m);
+      f(c);
+      return validateManifest(c).ok;
+    };
+    expect(withExtra((c) => (c.blocks[0].hidden = "UNAPPROVED"))).toBe(false);
+    expect(withExtra((c) => (c.blocks[0].html = "<script>"))).toBe(false);
+    expect(withExtra((c) => (c.blocks[1].items[0].extra = 1))).toBe(false);
+    expect(withExtra((c) => (c.blocks[3].note = "x"))).toBe(false);
+    expect(withExtra((c) => (c.contributor.email = "a@b"))).toBe(false);
+    expect(withExtra((c) => (c.extra = true))).toBe(false);
+    expect(withExtra((c) => (c.approval.note = "x"))).toBe(false);
+    expect(withExtra((c) => (c.blocks[2].mp4.extra = "x"))).toBe(false);
+    expect(withExtra((c) => (c.cover.variants["2048"] = c.cover.cid))).toBe(false);
+    const body: any = approvalBody(m);
+    body.blocks[0].hidden = "x";
+    expect(validateApprovalBody(body).ok).toBe(false);
+    expect(validateApprovalBody({ ...approvalBody(m), cid: "x" }).ok).toBe(false);
+  });
+
   it("rejects unknown block types and garbage", () => {
     const m = sampleManifest();
     expect(validateManifest({ ...m, blocks: [{ type: "html", html: "<script>" }] as never }).ok).toBe(false);

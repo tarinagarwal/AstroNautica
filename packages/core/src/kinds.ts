@@ -24,6 +24,7 @@ export const OWNER_LISTS = [
   "onions",
   "releases",
   "overrides",
+  "vouched",
 ] as const;
 
 /** Lists signed by each moderator (and the owner); clients take the union across current moderators. */

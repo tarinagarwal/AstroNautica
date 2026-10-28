@@ -270,7 +270,7 @@ export class Api {
   // ---- owner ----
   retryJob = (id: string) => this.request<unknown>("POST", `/jobs/${id}/retry`, { json: {} });
   auditLog = (before?: string) =>
-    this.request<AuditRow[] | { items: AuditRow[]; next?: string }>(
+    this.request<AuditRow[] | { events: AuditRow[]; next?: string | null }>(
       "GET",
       "/audit" + (before ? `?before=${encodeURIComponent(before)}` : ""),
     );

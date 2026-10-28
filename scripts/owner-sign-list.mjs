@@ -15,6 +15,11 @@
  *   service-keys --rotate-publisher <publisher-keys.json> | --owner-x25519 <hex>
  *   releases     --add <release.json>
  *   overrides    --add <list> <value> | --remove <list> <value>
+ *   vouched      --publisher <npub|hex> --manifests <file.json>   (manifest sha256s a retired publisher key may vouch;
+ *                see scripts/list-publisher-manifests.mjs and docs/runbooks/key-rotation.md)
+ *
+ * The full before/after diff is printed and must be confirmed (or pass --yes): a stale or tampered --current file
+ * could otherwise silently bring back a removed moderator or key.
  *
  * With --nsec-env NAME the secret key is read from that environment variable instead (tests and dev only).
  */
@@ -48,9 +53,14 @@ const keyOf = {
   "service-keys": "serviceKeys",
   releases: "releases",
   overrides: "overrides",
+  vouched: "vouched",
 }[name];
 if (!keyOf) fail(`unknown owner list: ${name}`);
-let items = structuredClone(lists[keyOf]);
+let items =
+  keyOf === "vouched"
+    ? [...lists.vouched.entries()].map(([publisher, set]) => ({ publisher, manifests: [...set] }))
+    : structuredClone(lists[keyOf]);
+const before = structuredClone(items);
 
 const one = (v) => (Array.isArray(v) ? v[0] : v);
 switch (name) {
@@ -126,6 +136,18 @@ switch (name) {
       );
     } else fail("--add required");
     break;
+  case "vouched": {
+    if (!args.publisher || !args.manifests) fail("usage: vouched --publisher <npub|hex> --manifests <file.json>");
+    const publisher = args.publisher.startsWith("npub") ? npubToHex(args.publisher) : args.publisher;
+    const manifests = JSON.parse(readFileSync(args.manifests, "utf8"));
+    if (!Array.isArray(manifests) || !manifests.every((m) => /^[0-9a-f]{64}$/.test(m)))
+      fail("manifests must be sha256 hex strings");
+    items = [
+      ...items.filter((i) => i.publisher !== publisher),
+      { publisher, manifests: [...new Set(manifests)].sort() },
+    ];
+    break;
+  }
   case "overrides": {
     const [list, value] = [one(args.add ?? args.remove), args._[1]];
     if (!list || !value) fail("usage: overrides --add <list> <value>");
@@ -133,6 +155,22 @@ switch (name) {
     if (args.add) items.push({ list, value });
     break;
   }
+}
+
+// Show exactly what changes before signing.
+const show = (x) => JSON.stringify(x);
+const beforeSet = new Set(before.map(show));
+const afterSet = new Set(items.map(show));
+console.log(`\nCurrent ${name} list (from --current, ${before.length} entries) → new list (${items.length} entries):`);
+for (const i of items) console.log(`  ${beforeSet.has(show(i)) ? " " : "+"} ${show(i)}`);
+for (const i of before) if (!afterSet.has(show(i))) console.log(`  - ${show(i)}`);
+if (!args.yes) {
+  if (!process.stdin.isTTY) fail("\nRefusing to sign without confirmation: pass --yes after checking the diff above.");
+  const { createInterface } = await import("node:readline/promises");
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const answer = await rl.question("\nSign this list? Type 'yes': ");
+  rl.close();
+  if (answer.trim() !== "yes") fail("Not signed.");
 }
 
 const event = createListEvent(name, items, secret, now);

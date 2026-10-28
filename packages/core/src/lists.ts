@@ -85,6 +85,15 @@ export interface OverrideEntry {
   value: string;
 }
 
+/**
+ * After a publisher key is retired (`until` set), its events are accepted only for manifests the owner lists here:
+ * `created_at` is chosen by the signer, so a stolen retired key could otherwise backdate new events (decision D17).
+ */
+export interface VouchedEntry {
+  publisher: string; // hex
+  manifests: string[]; // manifest sha256s
+}
+
 export interface OwnerListItems {
   moderators: ModeratorEntry[];
   "service-keys": ServiceKeyEntry[];
@@ -94,6 +103,7 @@ export interface OwnerListItems {
   onions: OnionEntry[];
   releases: ReleaseEntry[];
   overrides: OverrideEntry[];
+  vouched: VouchedEntry[];
 }
 
 /** A moderator-tier entry: the value (story id, event id or pubkey) and when it was added (unix seconds). */
@@ -207,6 +217,13 @@ function isValidItem(name: ListName, i: any): boolean {
       );
     case "overrides":
       return (MODERATOR_LISTS as readonly string[]).includes(i.list) && isStr(i.value);
+    case "vouched":
+      return (
+        HEX32.test(i.publisher) &&
+        Array.isArray(i.manifests) &&
+        i.manifests.length <= 1_000_000 &&
+        i.manifests.every((m: unknown) => typeof m === "string" && HEX32.test(m))
+      );
   }
 }
 
@@ -229,6 +246,33 @@ export const DEFAULT_DAILY_CAPS: DailyCaps = {
   "revoked-contributors": 50,
 };
 
+/**
+ * Max entries a single (non-owner) moderator's list may hold in total. A moderator writes the `addedAt` values
+ * themselves, so the daily cap alone could be dodged by backdating; this bound holds regardless (decision D18).
+ */
+export const DEFAULT_TOTAL_CAPS: DailyCaps = {
+  unlisted: 100,
+  hidden: 5000,
+  muted: 2000,
+  featured: 100,
+  "revoked-contributors": 100,
+};
+
+/** `signer|list|value` → unix seconds this client first saw the entry. Persist it where you can (decision D18). */
+export type FirstSeen = Map<string, number>;
+
+/** Record first-seen times for every moderator-list entry in `events` (call before `buildEffectiveLists`). */
+export function observeListEntries(events: Event[], firstSeen: FirstSeen, now = Math.floor(Date.now() / 1000)): void {
+  for (const e of events) {
+    const p = parseListEvent(e, now);
+    if (!p || !(MODERATOR_LISTS as readonly string[]).includes(p.name)) continue;
+    for (const [v] of p.items as ModeratorListItem[]) {
+      const k = `${p.author}|${p.name}|${v}`;
+      if (!firstSeen.has(k)) firstSeen.set(k, now);
+    }
+  }
+}
+
 export interface EffectiveLists {
   owner: string;
   /** Latest owner-signed lists. Empty arrays when a list was never found. */
@@ -240,6 +284,8 @@ export interface EffectiveLists {
   onions: OnionEntry[];
   releases: ReleaseEntry[];
   overrides: OverrideEntry[];
+  /** Manifests the owner vouches for, per retired publisher key. */
+  vouched: Map<string, Set<string>>;
   /** Moderators active right now (no `until`, or `until` in the future). */
   activeModerators: Set<string>;
   /** Effective contributor set: union of contributors minus revocations, both after overrides. */
@@ -266,11 +312,12 @@ export interface EffectiveLists {
 export function buildEffectiveLists(
   ownerKey: string,
   events: Event[],
-  opts: { now?: number; caps?: DailyCaps } = {},
+  opts: { now?: number; caps?: DailyCaps; totalCaps?: DailyCaps; firstSeen?: FirstSeen } = {},
 ): EffectiveLists {
   const owner = toPubkeyHex(ownerKey);
   const now = opts.now ?? Math.floor(Date.now() / 1000);
   const caps = opts.caps ?? DEFAULT_DAILY_CAPS;
+  const totalCaps = opts.totalCaps ?? DEFAULT_TOTAL_CAPS;
 
   const latest = new Map<string, ParsedList>(); // key: author|name
   for (const e of events) {
@@ -296,13 +343,27 @@ export function buildEffectiveLists(
       const p = latest.get(`${signer}|${name}`);
       if (!p) continue;
       let items = p.items as ModeratorListItem[];
-      const cap = caps[name];
-      if (signer !== owner && cap !== undefined) {
-        const recent = items.filter(([, at]) => at > now - 86400).sort((a, b) => a[1] - b[1]);
-        if (recent.length > cap) {
-          const dropped = new Set(recent.slice(cap).map(([v]) => v));
-          items = items.filter(([v, at]) => !(at > now - 86400 && dropped.has(v)));
+      if (signer !== owner) {
+        // When was each entry really added? Never before the moderator's tenure began or after the event was signed,
+        // and never before this client first saw it.
+        const from = moderators.find((m) => m.pubkey === signer && m.until === undefined)?.from ?? 0;
+        const at = new Map<string, number>();
+        for (const [v, declared] of items) {
+          let t = Math.min(Math.max(declared, from), p.createdAt);
+          const seen = opts.firstSeen?.get(`${signer}|${name}|${v}`);
+          if (seen !== undefined) t = Math.max(t, seen);
+          at.set(v, t);
         }
+        const byTime = [...items].sort((a, b) => at.get(a[0])! - at.get(b[0])!);
+        const keep = new Set(byTime.map(([v]) => v));
+        const total = totalCaps[name];
+        if (total !== undefined) for (const [v] of byTime.slice(total)) keep.delete(v);
+        const cap = caps[name];
+        if (cap !== undefined) {
+          const recent = byTime.filter(([v]) => keep.has(v) && at.get(v)! > now - 86400);
+          for (const [v] of recent.slice(cap)) keep.delete(v);
+        }
+        items = items.filter(([v]) => keep.has(v));
       }
       for (const [v] of items) {
         if (overridden.has(`${name}|${v}`)) continue;
@@ -330,6 +391,7 @@ export function buildEffectiveLists(
     onions: ownerList("onions"),
     releases: ownerList("releases"),
     overrides,
+    vouched: new Map(ownerList("vouched").map((v) => [v.publisher, new Set(v.manifests)])),
     activeModerators,
     contributors,
     revokedContributors,
@@ -355,12 +417,25 @@ export function wasModeratorAt(
   return lists.moderators.some((m) => m.pubkey === hex && m.from <= at && (m.until === undefined || at < m.until));
 }
 
-/** Was `pubkey` a valid publisher key at time `at`? */
-export function wasPublisherAt(lists: Pick<EffectiveLists, "serviceKeys">, pubkey: string, at: number): boolean {
+/**
+ * May an event by `pubkey`, dated `at`, about the manifest `manifestSha256` be trusted as the publisher's?
+ *
+ * For the current key: `from <= at`. For a retired key (`until` set) the event's date proves nothing, because the
+ * signer picks it; such events count only if the owner vouched for that manifest (decision D17).
+ */
+export function wasPublisherAt(
+  lists: Pick<EffectiveLists, "serviceKeys"> & { vouched?: Map<string, Set<string>> },
+  pubkey: string,
+  at: number,
+  manifestSha256?: string,
+): boolean {
   const hex = toPubkeyHex(pubkey);
-  return lists.serviceKeys.some(
-    (k) => k.role === "publisher" && k.pubkey === hex && k.from <= at && (k.until === undefined || at < k.until),
-  );
+  return lists.serviceKeys.some((k) => {
+    if (k.role !== "publisher" || k.pubkey !== hex || k.from > at) return false;
+    if (k.until === undefined) return true;
+    if (at >= k.until) return false;
+    return manifestSha256 !== undefined && (lists.vouched?.get(hex)?.has(manifestSha256) ?? false);
+  });
 }
 
 /** The publisher entry valid right now (the newest `from` among unexpired entries). */
@@ -379,4 +454,28 @@ export function editModeratorList(
 ): ModeratorListItem[] {
   const rest = items.filter(([v]) => v !== value);
   return op === "add" ? [...rest, [value, now]] : rest;
+}
+
+/**
+ * Was `address` the publisher's EVM key at block time `timestamp`? Chain receipts carry the writer's address and an
+ * unforgeable block timestamp, so (unlike Nostr `created_at`) the time can be trusted here (security review #10).
+ */
+export function wasPublisherEvmAt(
+  lists: Pick<EffectiveLists, "serviceKeys">,
+  address: string,
+  timestamp: number,
+): boolean {
+  const a = address.toLowerCase();
+  return lists.serviceKeys.some(
+    (k) =>
+      k.role === "publisher" &&
+      k.evm?.toLowerCase() === a &&
+      k.from <= timestamp &&
+      (k.until === undefined || timestamp < k.until),
+  );
+}
+
+/** The EVM addresses that ever served as publisher (to look receipts up by). */
+export function publisherEvmAddresses(lists: Pick<EffectiveLists, "serviceKeys">): string[] {
+  return [...new Set(lists.serviceKeys.filter((k) => k.role === "publisher" && k.evm).map((k) => k.evm!))];
 }

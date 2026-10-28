@@ -156,11 +156,29 @@ export async function nodeOrigins(apiUrls: string[]): Promise<string[]> {
     try {
       const id = await create({ url }).id();
       out.push(
-        ...id.addresses.map((a) => a.toString()).filter((a) => !a.includes("/127.0.0.1/") && !a.includes("/::1/")),
+        ...id.addresses.map((a) => a.toString()).filter(isPublicMultiaddr),
       );
     } catch {
       // a node being down only means fewer origins
     }
   }
   return out;
+}
+
+/** Only public addresses go to third-party pinning services: never loopback, private or link-local ones. */
+export function isPublicMultiaddr(a: string): boolean {
+  const v4 = a.match(/^\/ip4\/(\d+)\.(\d+)\.\d+\.\d+\//);
+  if (v4) {
+    const [x, y] = [Number(v4[1]), Number(v4[2])];
+    if (x === 10 || x === 127 || x === 0 || (x === 169 && y === 254) || (x === 192 && y === 168)) return false;
+    if (x === 172 && y >= 16 && y <= 31) return false;
+    if (x === 100 && y >= 64 && y <= 127) return false;
+    return true;
+  }
+  const v6 = a.match(/^\/ip6\/([^/]+)\//);
+  if (v6) {
+    const h = v6[1]!.toLowerCase();
+    return !(h === "::1" || h.startsWith("fe80") || h.startsWith("fc") || h.startsWith("fd") || h === "::");
+  }
+  return a.startsWith("/dns");
 }

@@ -76,6 +76,24 @@ export class PublisherDb {
     return !rows[0] || rows[0].revoked_at !== null;
   }
 
+  async publishedVersion(storyId: string, version: number): Promise<{ manifest_sha256: string } | null> {
+    const { rows } = await this.pool.query(
+      `SELECT manifest_sha256 FROM submissions WHERE story_id = $1 AND version = $2 AND state IN ('published', 'unlisted')`,
+      [storyId, version],
+    );
+    return rows[0] ?? null;
+  }
+
+  /** A job that can never succeed: stop retrying (the owner is alerted and can retry by hand after fixing). */
+  async blockJob(id: string, reason: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE publish_jobs SET state = 'blocked', locked_by = NULL, locked_until = NULL, updated_at = now(),
+              steps = jsonb_set(steps, '{blocked}', $2::jsonb, true)
+        WHERE submission_id = $1`,
+      [id, JSON.stringify({ done: false, error: reason, attempts: 1, at: new Date().toISOString() })],
+    );
+  }
+
   async saveStep(id: string, name: string, rec: StepRecord): Promise<void> {
     await this.pool.query(
       `UPDATE publish_jobs SET steps = jsonb_set(steps, $2, $3::jsonb, true), updated_at = now() WHERE submission_id = $1`,

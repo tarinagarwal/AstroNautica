@@ -20,6 +20,8 @@ export interface PublisherConfig {
   databaseUrl: string;
   stagingDir: string;
   workDir: string;
+  /** Isolated media worker (services/media server). When set, `workDir` must be the volume it shares. */
+  mediaUrl?: string;
   seedDir: string;
   /** Where the seed box watches for new .torrent files (default: seedDir). */
   seedWatchDir: string;
@@ -67,7 +69,8 @@ export function loadConfig(rawEnv: NodeJS.ProcessEnv = process.env, root = findR
   return {
     databaseUrl: need(env.DATABASE_URL ?? devConfig?.databaseUrl, "DATABASE_URL"),
     stagingDir: resolve(root, need(env.STAGING_DIR ?? devConfig?.stagingDir, "STAGING_DIR")),
-    workDir: resolve(root, env.WORK_DIR ?? devConfig?.workDir ?? ".dev/publisher-work"),
+    workDir: resolve(root, env.MEDIA_SHARED_DIR ?? env.WORK_DIR ?? devConfig?.workDir ?? ".dev/publisher-work"),
+    mediaUrl: env.MEDIA_URL || undefined,
     seedDir: resolve(root, env.SEED_DIR ?? devConfig?.seedDir ?? ".dev/seed"),
     seedWatchDir: resolve(root, env.SEEDBOX_WATCH_DIR ?? env.SEED_DIR ?? devConfig?.seedDir ?? ".dev/seed"),
     ownerPubkey: need(env.OWNER_PUBKEY ?? devConfig?.ownerPubkey, "OWNER_PUBKEY"),

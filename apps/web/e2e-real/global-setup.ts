@@ -106,10 +106,12 @@ export default async function globalSetup() {
   if (!existsSync(cfgPath) || !existsSync(join(repo, ".dev/keys.json")))
     throw new Error("run `node scripts/dev-setup.mjs` first (with the infra/dev docker compose stack up)");
   const cfg = JSON.parse(readFileSync(cfgPath, "utf8")) as DevConfig;
-  if (await fetch(`${cfg.apiUrl}/health`).then(
-    (r) => r.ok,
-    () => false,
-  ))
+  if (
+    await fetch(`${cfg.apiUrl}/health`).then(
+      (r) => r.ok,
+      () => false,
+    )
+  )
     throw new Error(`something is already listening on ${cfg.apiUrl}; stop it first`);
 
   makeMedia();
@@ -122,7 +124,11 @@ export default async function globalSetup() {
   let stopping = false;
   const start = (name: string, script: string, env: Record<string, string>) => {
     const log = createWriteStream(join(OUT, `${name}.log`));
-    const p = spawn("node", [script], { cwd: repo, env: { ...process.env, ...env }, stdio: ["ignore", "pipe", "pipe"] });
+    const p = spawn("node", [script], {
+      cwd: repo,
+      env: { ...process.env, ...env },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     p.stdout!.pipe(log);
     p.stderr!.pipe(log);
     p.on("exit", (code) => {
@@ -149,7 +155,8 @@ export default async function globalSetup() {
   try {
     await until(async () => died.length === 0 && (await fetch(`${cfg.apiUrl}/health`)).ok, 30_000, "API health");
     await until(
-      async () => ((await (await fetch(`${cfg.apiUrl}/config`)).json()) as { moderators?: unknown[] }).moderators?.length,
+      async () =>
+        ((await (await fetch(`${cfg.apiUrl}/config`)).json()) as { moderators?: unknown[] }).moderators?.length,
       30_000,
       "API lists",
     );

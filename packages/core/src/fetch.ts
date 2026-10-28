@@ -130,8 +130,9 @@ export async function fetchVerified(opts: FetchVerifiedOptions): Promise<Uint8Ar
         report({ ok: false, reason: "too-large" });
         throw new Error("too large");
       }
-      const bytes = new Uint8Array(await res.arrayBuffer());
-      if (bytes.length > maxBytes) {
+      // Stream with a cap: a hostile gateway must not be able to exhaust memory with an endless body.
+      const bytes = await readCapped(res, maxBytes);
+      if (!bytes) {
         report({ ok: false, reason: "too-large" });
         throw new Error("too large");
       }
@@ -164,4 +165,32 @@ export async function fetchVerified(opts: FetchVerifiedOptions): Promise<Uint8Ar
     }
   }
   throw new VerifiedFetchError(`no source served a file matching sha256 ${opts.sha256}`, reports);
+}
+
+/** Read a body, returning null as soon as it exceeds `max` bytes. */
+async function readCapped(res: Response, max: number): Promise<Uint8Array | null> {
+  if (!res.body) {
+    const b = new Uint8Array(await res.arrayBuffer());
+    return b.length > max ? null : b;
+  }
+  const reader = res.body.getReader();
+  const parts: Uint8Array[] = [];
+  let n = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    n += value.length;
+    if (n > max) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    parts.push(value);
+  }
+  const out = new Uint8Array(n);
+  let off = 0;
+  for (const p of parts) {
+    out.set(p, off);
+    off += p.length;
+  }
+  return out;
 }

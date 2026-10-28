@@ -30,4 +30,5 @@ COPY --from=build /out ./
 ENV NODE_ENV=production
 # Unprivileged; the compose file adds a read-only root, a tmpfs /tmp, no capabilities and memory/pid limits.
 USER node
-ENTRYPOINT ["node", "/app/dist/cli.js"]
+# Default: the media worker (POST /process). For the CLI: docker compose run --rm media node /app/dist/cli.js image <in> <out>
+CMD ["node", "/app/dist/server.js"]

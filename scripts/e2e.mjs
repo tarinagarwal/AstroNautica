@@ -65,6 +65,7 @@ const OWNER = parseSecretKey(keys.owner.nsec);
 const MOD = keys.moderators[0];
 const MOD_SK = parseSecretKey(MOD.nsec);
 const MOD_B_SK = parseSecretKey(keys.moderators[1].nsec);
+const PUBLISHER_EVM = (await import("viem/accounts")).privateKeyToAccount(keys.publisher.evmPrivateKey).address;
 const compose = ["compose", "-f", join(repoRoot, "infra/dev/docker-compose.yml")];
 
 // ---------- tiny test harness ----------
@@ -94,7 +95,7 @@ async function until(fn, timeoutMs, label) {
 }
 
 // ---------- services ----------
-const logs = { api: [], publisher: [] };
+const logs = { api: [], publisher: [], media: [] };
 const children = [];
 let stopping = false;
 const died = [];
@@ -229,7 +230,21 @@ async function main() {
   });
   await until(async () => (await fetch(`${API}/health`).catch(() => null))?.ok, 30000, "API health");
   await until(async () => (await (await fetch(`${API}/config`)).json()).moderators?.length > 0, 30000, "API lists");
-  start("publisher", "node", ["services/publisher/dist/main.js"], { POLL_MS: "500", STAGING_DIR: stagingDir });
+  // Media runs as the isolated worker, as in production (security review #7); the publisher only talks HTTP to it.
+  const mediaShared = join(repoRoot, cfg.workDir);
+  mkdirSync(mediaShared, { recursive: true });
+  start("media", "node", ["services/media/dist/server.js"], {
+    MEDIA_SHARED_DIR: mediaShared,
+    MEDIA_PORT: "3011",
+    MEDIA_HOST: "127.0.0.1",
+  });
+  await until(async () => (await fetch("http://127.0.0.1:3011/health").catch(() => null))?.ok, 20000, "media worker");
+  start("publisher", "node", ["services/publisher/dist/main.js"], {
+    POLL_MS: "500",
+    STAGING_DIR: stagingDir,
+    MEDIA_URL: "http://127.0.0.1:3011",
+    MEDIA_SHARED_DIR: mediaShared,
+  });
   await sleep(1500);
   check("API is up with the signed lists", true);
 
@@ -474,7 +489,7 @@ async function main() {
       sha256Hex(new Uint8Array(await (await fetch(`${cfg.arweave}/${sr.arweave[jpgSha]}`)).arrayBuffer())) === jpgSha,
   );
   for (const c of cfg.chains) {
-    const onChain = await receiptOnChain(c, storyId, 1);
+    const onChain = await receiptOnChain(c, storyId, 1, PUBLISHER_EVM);
     check(
       `receipt on ${c.key} (chain ${c.chainId}) matches the manifest hash`,
       onChain.sha === ref.manifestSha256,
@@ -634,7 +649,7 @@ async function main() {
         }).catch(() => null));
       const ok = Boolean(b && verifyManifest(b, r, L).ok);
       let chainOk = true;
-      if (svc === "anvil") chainOk = (await receiptOnChain(cfg.chains[1], storyId, 1)).sha === ref.manifestSha256;
+      if (svc === "anvil") chainOk = (await receiptOnChain(cfg.chains[1], storyId, 1, PUBLISHER_EVM)).sha === ref.manifestSha256;
       check(`with ${svc} stopped the story is listed, fetched and verified`, ok && chainOk);
     } finally {
       execFileSync("docker", [...compose, "start", svc], { stdio: "ignore" });

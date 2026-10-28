@@ -47,6 +47,8 @@ import {
   verifyRedemption,
   verifyEventStrict,
   wasModeratorAt,
+  wasPublisherAt,
+  observeListEntries,
   wrapKey,
   wrapKeyFor,
   type GatewayEntry,
@@ -205,6 +207,19 @@ describe("signed lists (two tiers)", () => {
     expect(buildEffectiveLists(owner.pubkey, ownerEvents, { now: NOW }).unlisted.size).toBe(30);
   });
 
+  it("can't dodge the caps by backdating entries", () => {
+    // Moderator A became a moderator at NOW-10000 (ownerLists); claims entries were added long ago.
+    const items = Array.from({ length: 1000 }, (_, i) => [`s${i}`, 1 + i] as [string, number]);
+    const events = ownerLists([createListEvent("unlisted", items, modA.secretKey, NOW - 1)]);
+    const L = buildEffectiveLists(owner.pubkey, events, { now: NOW });
+    expect(L.unlisted.size).toBeLessThanOrEqual(100); // total cap
+    // A client that saw all of them appear just now applies the daily cap too.
+    const firstSeen = new Map<string, number>();
+    observeListEntries(events, firstSeen, NOW);
+    const L2 = buildEffectiveLists(owner.pubkey, events, { now: NOW, firstSeen });
+    expect(L2.unlisted.size).toBe(20);
+  });
+
   it("computes contributors minus revocations", () => {
     const events = ownerLists([
       createListEvent(
@@ -227,6 +242,36 @@ describe("signed lists (two tiers)", () => {
     items = editModeratorList(items, "add", "x", 2);
     expect(items).toEqual([["x", 2]]);
     expect(editModeratorList(items, "remove", "x")).toEqual([]);
+  });
+
+  it("accepts a retired publisher key only for manifests the owner vouched for", () => {
+    const old = generateKeyPair();
+    const keysList = createListEvent(
+      "service-keys",
+      [
+        { role: "publisher", pubkey: old.pubkey, from: NOW - 1000, until: NOW - 10 },
+        { role: "publisher", pubkey: publisher.pubkey, from: NOW - 10 },
+      ],
+      owner.secretKey,
+      NOW - 5,
+    );
+    const good = "a".repeat(64);
+    const vouched = createListEvent("vouched", [{ publisher: old.pubkey, manifests: [good] }], owner.secretKey, NOW - 5);
+    const L = buildEffectiveLists(owner.pubkey, [keysList, vouched], { now: NOW });
+    // Backdated event from the stolen retired key: rejected unless vouched.
+    expect(wasPublisherAt(L, old.pubkey, NOW - 500, "b".repeat(64))).toBe(false);
+    expect(wasPublisherAt(L, old.pubkey, NOW - 500)).toBe(false);
+    expect(wasPublisherAt(L, old.pubkey, NOW - 500, good)).toBe(true);
+    expect(wasPublisherAt(L, old.pubkey, NOW - 5, good)).toBe(false); // after `until`
+    expect(wasPublisherAt(L, publisher.pubkey, NOW - 5, "b".repeat(64))).toBe(true);
+
+    const forged = createStoryEvent({
+      manifest: publishedManifest(modA, { version: 999, publisher: old.npub }),
+      manifestCid: "bafyforged",
+      secretKey: old.secretKey,
+      createdAt: NOW - 500,
+    });
+    expect(selectStories([forged], { ...L, unlisted: new Set() })).toHaveLength(0);
   });
 
   it("knows the current publisher after a rotation", () => {
@@ -308,6 +353,28 @@ describe("verified fetching", () => {
     expect(reports).toContain("https://down/f:network");
     expect(reports).toContain("https://404/f:http");
     expect(reports).toContain("https://slow/f:timeout");
+  });
+
+  it("stops reading an oversized body without a content-length", async () => {
+    const endless = () =>
+      new Response(
+        new ReadableStream({
+          pull(c) {
+            c.enqueue(new Uint8Array(64 * 1024));
+          },
+        }),
+      );
+    const reports: string[] = [];
+    await expect(
+      fetchVerified({
+        sources: [{ base: "big", url: "https://big/f" }],
+        sha256: goodHash,
+        fetch: async () => endless(),
+        maxBytes: 1024 * 1024,
+        onReport: (r) => reports.push(r.reason ?? "ok"),
+      }),
+    ).rejects.toThrow(/no source/);
+    expect(reports).toEqual(["too-large"]);
   });
 
   it("throws when nobody has the right bytes", async () => {

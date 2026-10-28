@@ -98,7 +98,7 @@ export function parseStoryEvent(e: Event): StoryRef | null {
  */
 export function selectStories(
   events: Event[],
-  lists: Pick<EffectiveLists, "serviceKeys" | "unlisted">,
+  lists: Pick<EffectiveLists, "serviceKeys" | "unlisted"> & { vouched?: EffectiveLists["vouched"] },
   opts: { includeUnlisted?: boolean } = {},
 ): StoryRef[] {
   const best = new Map<string, StoryRef>();
@@ -108,7 +108,7 @@ export function selectStories(
     seen.add(e?.id);
     const r = parseStoryEvent(e);
     if (!r) continue;
-    if (!wasPublisherAt(lists, r.publisher, r.createdAt)) continue;
+    if (!wasPublisherAt(lists, r.publisher, r.createdAt, r.manifestSha256)) continue;
     if (!opts.includeUnlisted && lists.unlisted.has(r.storyId)) continue;
     const cur = best.get(r.storyId);
     if (!cur || r.version > cur.version || (r.version === cur.version && r.createdAt > cur.createdAt)) {
@@ -233,15 +233,19 @@ export function createStorageReceiptEvent(
 
 const ARWEAVE_TX = /^[A-Za-z0-9_-]{43}$/;
 
-export function parseStorageReceipt(e: Event, lists: Pick<EffectiveLists, "serviceKeys">): StorageReceipt | null {
+export function parseStorageReceipt(
+  e: Event,
+  lists: Pick<EffectiveLists, "serviceKeys"> & { vouched?: EffectiveLists["vouched"] },
+): StorageReceipt | null {
   if (e?.kind !== KIND_APP_DATA) return null;
   const d = tag(e, "d")?.[1];
   if (!d?.startsWith(STORAGE_D_PREFIX)) return null;
-  if (!verifyEventStrict(e) || !wasPublisherAt(lists, e.pubkey, e.created_at)) return null;
+  if (!verifyEventStrict(e)) return null;
   try {
     const c = JSON.parse(e.content);
     if (c.schema !== "azaadawaaz/storage@1" || d !== storageD(c.storyId, c.version)) return null;
     if (!isSha256Hex(c.manifestSha256) || typeof c.arweave !== "object" || c.arweave === null) return null;
+    if (!wasPublisherAt(lists, e.pubkey, e.created_at, c.manifestSha256)) return null;
     const arweave: Record<string, string> = {};
     for (const [k, v] of Object.entries(c.arweave))
       if (isSha256Hex(k) && typeof v === "string" && ARWEAVE_TX.test(v)) arweave[k] = v;

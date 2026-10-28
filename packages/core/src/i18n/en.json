@@ -33,6 +33,7 @@
   "verify.publisher": "Publisher signature",
   "comments.title": "Comments",
   "comments.count": "{count} comments",
+  "comments.countOne": "1 comment",
   "comments.placeholder": "Write a comment",
   "comments.post": "Post",
   "comments.reply": "Reply",

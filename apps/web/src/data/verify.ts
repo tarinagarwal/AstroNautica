@@ -11,7 +11,7 @@ import { wasPublisherAt } from "@core/lists.js";
 import type { AppData } from "./appData.js";
 import { blockSource, flaggedSources, gatewayFetch, getGateways, scoreboard } from "../lib/gateways.js";
 import { fetchFileByCid } from "../lib/ipfs.js";
-import { checkChainReceipt, type ChainReceipt } from "../lib/eth.js";
+import { checkChainReceipt, publisherWindows, type ChainReceipt } from "../lib/eth.js";
 
 export type CheckState = "pending" | "ok" | "fail";
 
@@ -62,7 +62,7 @@ export async function verifyStory(
 
   // 1. The announcing event: signed by a publisher key valid at the time.
   const eventOk =
-    verifyEventStrict(ref.event) && !!app.lists && wasPublisherAt(app.lists, ref.publisher, ref.createdAt);
+    verifyEventStrict(ref.event) && !!app.lists && wasPublisherAt(app.lists, ref.publisher, ref.createdAt, ref.manifestSha256);
   update({ event: { state: eventOk ? "ok" : "fail" } });
 
   const tasks: Promise<void>[] = [];
@@ -139,7 +139,9 @@ export async function verifyStory(
       const chains = app.config.chains;
       if (!chains.length) return update({ chains: { state: "fail", receipts: [], error: "no-chains" } });
       const receipts = await Promise.all(
-        chains.map((c) => checkChainReceipt(c, ref.storyId, ref.version, ref.manifestSha256, rpcFetch)),
+        chains.map((c) =>
+          checkChainReceipt(c, ref.storyId, ref.version, ref.manifestSha256, publisherWindows(app.lists?.serviceKeys ?? []), rpcFetch),
+        ),
       );
       update({ chains: { state: receipts.every((x) => x.ok) ? "ok" : "fail", receipts } });
     })(),

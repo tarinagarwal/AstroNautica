@@ -28,17 +28,21 @@ export function Review() {
 
   useEffect(() => {
     let c = false;
-    // Opening claims the submission for a while so two moderators don't review it at once (advisory).
-    void api.claim(id).catch(() => {});
-    openSubmission(api, id, mod.x25519).then(
-      (o) => !c && setOpened(o),
-      (e: unknown) => {
-        if (c) return;
-        if (e instanceof PreviewError)
-          setError(t(`preview.error.${e.code}`) + (e.message !== e.code ? ` (${e.message})` : ""));
-        else setError(errorText(e));
-      },
-    );
+    // Opening claims the submission for a while so two moderators don't review it at once (advisory). Load it after
+    // the claim settles so the state shown ("in review") is current.
+    api
+      .claim(id)
+      .catch(() => {})
+      .then(() => openSubmission(api, id, mod.x25519))
+      .then(
+        (o) => !c && setOpened(o),
+        (e: unknown) => {
+          if (c) return;
+          if (e instanceof PreviewError)
+            setError(t(`preview.error.${e.code}`) + (e.message !== e.code ? ` (${e.message})` : ""));
+          else setError(errorText(e));
+        },
+      );
     return () => {
       c = true;
     };

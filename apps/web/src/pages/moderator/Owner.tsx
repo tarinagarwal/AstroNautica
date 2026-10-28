@@ -137,7 +137,7 @@ function AuditLog() {
     async (before?: string) => {
       try {
         const r = await api.auditLog(before);
-        const items = Array.isArray(r) ? r : r.items;
+        const items = Array.isArray(r) ? r : (r.events ?? []);
         setRows((prev) => (before ? [...prev, ...items] : items));
         const last = items[items.length - 1];
         setNext(Array.isArray(r) ? (items.length ? last?.createdAt : null) : (r.next ?? null));

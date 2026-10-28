@@ -7,10 +7,12 @@
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createAuthHeader, parseSecretKey } from "@azaadawaaz/core";
+import type { ImageBlock, Manifest, VideoBlock } from "@azaadawaaz/schema";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, "../../..");
@@ -77,15 +79,26 @@ async function apiGet<T>(path: string, nsec: string): Promise<T> {
   return (await r.json()) as T;
 }
 
-/** Bytes of an <img>'s blob: URL, read inside the page (it is what the reader actually sees). */
+/**
+ * Bytes of an <img>'s blob: URL (exactly what the reader sees). The app's CSP rightly blocks fetch() of blob: URLs,
+ * so they are read from another same-origin page of the same browser context that has no CSP (a static asset).
+ */
 async function imgBytes(page: Page, selector: string): Promise<Buffer> {
-  const b64 = await page.locator(selector).first().evaluate(async (el: HTMLImageElement) => {
-    const buf = new Uint8Array(await (await fetch(el.src)).arrayBuffer());
-    let s = "";
-    for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode(...buf.subarray(i, i + 0x8000));
-    return btoa(s);
-  });
-  return Buffer.from(b64, "base64");
+  const src = await page.locator(selector).first().getAttribute("src");
+  if (!src?.startsWith("blob:")) throw new Error(`not a blob URL: ${src}`);
+  const helper = await page.context().newPage();
+  try {
+    await helper.goto("./favicon.svg");
+    const b64 = await helper.evaluate(async (u) => {
+      const buf = new Uint8Array(await (await fetch(u)).arrayBuffer());
+      let s = "";
+      for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+      return btoa(s);
+    }, src);
+    return Buffer.from(b64, "base64");
+  } finally {
+    await helper.close();
+  }
 }
 
 function exif(bytes: Buffer, name: string): string {
@@ -101,7 +114,8 @@ interface Job {
   state: string;
   submissionState: string;
   attempts: number;
-  steps: Record<string, { done: boolean; error?: string }>;
+  storyId: string;
+  steps: Record<string, { done: boolean; error?: string; result?: unknown }>;
 }
 
 test("a story's whole life through the real UI and the real dev network", async ({ browser }) => {
@@ -117,6 +131,7 @@ test("a story's whole life through the real UI and the real dev network", async 
   let inviteLink = "";
   let submissionId = "";
   let storyId = "";
+  let manifestCid = "";
 
   // ---------------------------------------------------------------------------------------------------------------
   await test.step("1. owner creates an invite; the contributor redeems it on a new key", async () => {
@@ -254,9 +269,8 @@ test("a story's whole life through the real UI and the real dev network", async 
         { timeout: 10 * 60_000, intervals: [2000] },
       )
       .toBe("published/done");
-    storyId = ((await apiGet<{ storyId: string }[]>("/jobs", moderatorKey.nsec)).find(
-      (j) => (j as unknown as Job).submissionId === submissionId,
-    ) as { storyId: string }).storyId;
+    storyId = last!.storyId;
+    manifestCid = (last!.steps.manifest!.result as { cid: string }).cid;
     expect(Object.keys(last!.steps)).toEqual(expect.arrayContaining(["chain:base-local", "chain:bsc-local"]));
 
     // The same status in the moderator's Publishing page.
@@ -265,6 +279,8 @@ test("a story's whole life through the real UI and the real dev network", async 
     const job = page.locator(".job").filter({ hasText: submissionId.slice(0, 8) });
     await expect(job).toContainText("done");
     await expect(job.locator(".steps li.ok")).toHaveCount(Object.keys(last!.steps).length);
+    await expect(job.locator(".steps li").first()).toContainText("decrypt");
+    await expect(job.locator(".steps li").last()).toContainText("finalize");
     await shot(page, "10-moderator-jobs");
   });
 
@@ -291,6 +307,21 @@ test("a story's whole life through the real UI and the real dev network", async 
     await img.scrollIntoViewIfNeeded();
     await expect(img).toHaveAttribute("src", /^blob:/, { timeout: 60_000 });
     await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
+    // The published sources on IPFS (original photo, cover, MP4 fallback) carry no location or device either.
+    const gw = "http://127.0.0.1:8080/ipfs/";
+    const get = async (cid: string) => Buffer.from(await (await fetch(gw + cid)).arrayBuffer());
+    const manifest = JSON.parse((await get(manifestCid)).toString("utf8")) as Manifest;
+    const photo = manifest.blocks.find((b): b is ImageBlock => b.type === "image")!.items[0]!;
+    const clip = manifest.blocks.find((b): b is VideoBlock => b.type === "video")!;
+    for (const [name, ref] of [
+      ["original-photo.jpg", photo],
+      ["cover.jpg", manifest.cover!],
+      ["fallback.mp4", clip.mp4],
+    ] as const) {
+      const bytes = await get(ref.cid);
+      expect(createHash("sha256").update(bytes).digest("hex")).toBe(ref.sha256);
+      expect(exif(bytes, name)).not.toMatch(/GPS|Samsung|SM-G991B|Real Name|28\.6139|26\.8467/);
+    }
     const shown = exif(await imgBytes(page, ".story-body [data-testid=image-block] .vimg img"), "story-image");
     expect(shown).not.toMatch(/GPS|Samsung|SM-G991B|Real Name/);
     await page.evaluate(() => window.scrollTo(0, 0));
@@ -334,6 +365,12 @@ test("a story's whole life through the real UI and the real dev network", async 
     for (const r of await receipts.all()) await expect(r.locator(".mark")).toHaveClass(/ok/);
     await expect(panel.locator("dt").filter({ hasText: "Arweave" }).locator(".mark")).toHaveClass(/ok/);
     await expect(panel.locator(".mark.fail")).toHaveCount(0);
+    // No horizontal page scroll on a phone, even with long hashes in the panel.
+    const overflow = await page.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth,
+      w: document.documentElement.clientWidth,
+    }));
+    expect(overflow.scroll).toBeLessThanOrEqual(overflow.w);
     await panel.scrollIntoViewIfNeeded();
     await panel.screenshot({ path: join(shots, "15-reader-verify-phone.png") });
   });
@@ -346,6 +383,7 @@ test("a story's whole life through the real UI and the real dev network", async 
     await expect(page.getByTestId("comment").filter({ hasText: COMMENT })).toBeVisible({ timeout: 120_000 });
     await page.getByTestId("reaction-👍").click();
     await expect(page.getByTestId("reaction-👍")).toContainText("1", { timeout: 120_000 });
+    await expect(page.locator("#comments-h")).toContainText("(1 comment)");
     await page.reload();
     await expect(page.getByTestId("comment").filter({ hasText: COMMENT })).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId("reaction-👍")).toContainText("1");
@@ -375,7 +413,10 @@ test("a story's whole life through the real UI and the real dev network", async 
   // ---------------------------------------------------------------------------------------------------------------
   await test.step("7. the contributor's submissions show it published", async () => {
     const page = contributor;
-    await page.evaluate(() => (location.hash = "#/contribute"));
+    // The contributor comes back later: the key is unlocked again from this browser's encrypted vault.
+    await page.reload();
+    await page.getByLabel("Passphrase", { exact: true }).fill(PASS);
+    await page.getByRole("button", { name: "Unlock" }).click();
     const mine = page.locator(".submission").filter({ hasText: TITLE_EN });
     await expect(mine.locator(".state")).toHaveText("published");
     await expect(mine.getByRole("link", { name: "View" })).toBeVisible();

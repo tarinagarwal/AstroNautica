@@ -25,6 +25,7 @@ import {
   RelayPool,
   unwrapKey,
   verifyApprovalSignature,
+  wasModeratorAt,
   type EffectiveLists,
   type Event,
 } from "@azaadawaaz/core";
@@ -37,6 +38,23 @@ import { ArweaveStore } from "./arweave.js";
 import { createVideoTorrent } from "./torrent.js";
 import { writeReceipt } from "./chain.js";
 import { loadLists, publishRelays } from "./lists.js";
+
+/** A failure that retrying can't fix (revoked contributor, removed moderator, tampered body). The job is blocked. */
+export class PolicyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PolicyError";
+  }
+}
+
+/** Keep only the languages a localized field may have, so nothing unapproved rides along (security review #5). */
+function lt<T extends { en?: string; hi?: string } | undefined>(t: T): T {
+  if (!t) return t;
+  const out: { en?: string; hi?: string } = {};
+  if (typeof t.en === "string") out.en = t.en;
+  if (typeof t.hi === "string") out.hi = t.hi;
+  return out as T;
+}
 
 export interface PipelineDeps {
   config: PublisherConfig;
@@ -117,6 +135,25 @@ export class Pipeline {
       for (const s of LOCAL_STEPS) delete steps[s];
     }
     const row = await this.d.db.getSubmission(id);
+    // Long steps (video transcoding) can outlast the lock; keep extending it while we work.
+    const heartbeat = setInterval(() => {
+      this.d.db.extendLock(id, this.d.config.workerId).catch(() => {});
+    }, 60_000);
+    try {
+      await this.runSteps(id, row, steps);
+    } catch (e) {
+      if (e instanceof PolicyError) {
+        rmSync(this.work(id), { recursive: true, force: true });
+        await this.d.db.blockJob(id, e.message);
+        await this.d.db.alertOwner("publish_blocked", { submission: id, reason: e.message });
+      }
+      throw e;
+    } finally {
+      clearInterval(heartbeat);
+    }
+  }
+
+  private async runSteps(id: string, row: SubmissionRow, steps: Record<string, StepRecord>): Promise<void> {
     for (const name of stepNames(this.d.config)) {
       if (steps[name]?.done) continue;
       const prev = steps[name];
@@ -204,21 +241,28 @@ export class Pipeline {
   private async checks(row: SubmissionRow) {
     const body = this.body(row);
     const v = validateApprovalBody(body);
-    if (!v.ok) throw new Error(`approval body invalid: ${v.errors.join("; ")}`);
+    if (!v.ok) throw new PolicyError(`approval body invalid: ${v.errors.join("; ")}`);
     if (!hexEquals(approvalBodySha256(body), row.approval_body_sha256))
-      throw new Error("decrypted body does not match the hash the moderator approved");
-    if (!verifyApprovalSignature(body, row.approval)) throw new Error("approval signature does not verify");
+      throw new PolicyError("decrypted body does not match the hash the moderator approved");
+    if (!verifyApprovalSignature(body, row.approval)) throw new PolicyError("approval signature does not verify");
     if (body.id !== row.story_id || body.version !== row.version || body.supersedes !== (row.supersedes ?? null))
-      throw new Error("body id/version/supersedes differ from the submission");
+      throw new PolicyError("body id/version/supersedes differ from the submission");
     if (npubToHex(body.contributor.pubkey) !== row.contributor)
-      throw new Error("body contributor differs from submitter");
+      throw new PolicyError("body contributor differs from submitter");
 
     const lists = await this.lists();
     const mod = npubToHex(row.approval.moderator);
     if (mod !== lists.owner && !lists.activeModerators.has(mod))
-      throw new Error("approving moderator is no longer on the list");
-    if ((await this.d.db.isContributorRevoked(row.contributor)) || lists.revokedContributors.has(row.contributor))
-      throw new Error("contributor has been revoked");
+      throw new PolicyError("approving moderator is no longer on the list");
+    // Revocation is decided by the owner through the API (database), not by any single moderator's signed list,
+    // so a rogue moderator can't halt publishing by revoking everyone (security review #4).
+    if (await this.d.db.isContributorRevoked(row.contributor)) throw new PolicyError("contributor has been revoked");
+    if (row.version > 1) {
+      const prev = await this.d.db.publishedVersion(row.story_id, row.version - 1);
+      if (!prev) throw new Error(`version ${row.version - 1} of this story is not published yet`);
+      if (prev.manifest_sha256 !== row.supersedes)
+        throw new PolicyError("supersedes does not match the previous published version's manifest");
+    }
 
     const kinds = new Map(row.media.map((m) => [m.sha256, m.kind]));
     for (const b of body.blocks) {
@@ -257,50 +301,94 @@ export class Pipeline {
       if (!used.has(m.sha256)) continue;
       const src = this.work(row.id, "src", m.sha256);
       if (m.kind === "image") {
-        const r = await processImage(new Uint8Array(readFileSync(src)));
-        if (!hexEquals(r.original.sha256, m.sha256))
-          throw new Error(`image ${m.sha256} still carried metadata after on-device stripping; refusing to publish it`);
         const dir = this.work(row.id, "out", "img", m.sha256);
         mkdirSync(dir, { recursive: true });
-        writeFileSync(join(dir, "original"), r.original.bytes);
-        const variants: ImageOut["variants"] = {};
-        for (const [w, v] of Object.entries(r.variants)) {
-          if (!v) continue;
-          writeFileSync(join(dir, `${w}.webp`), v.bytes);
-          variants[w] = { file: `${w}.webp`, sha256: v.sha256, width: v.width, height: v.height };
-        }
+        const r = await this.processImageAt(src, dir);
+        if (!hexEquals(r.originalSha256, m.sha256))
+          throw new PolicyError(`image ${m.sha256} still carried metadata after on-device stripping; refusing to publish it`);
         out.images[m.sha256] = {
           sha256: m.sha256,
-          mime: r.original.mime,
-          width: r.original.width,
-          height: r.original.height,
+          mime: r.mime,
+          width: r.width,
+          height: r.height,
           blurhash: r.blurhash,
-          variants,
+          variants: r.variants,
         };
       } else {
         const dir = this.work(row.id, "out", "vid", m.sha256);
         rmSync(dir, { recursive: true, force: true });
         mkdirSync(dir, { recursive: true });
-        const r = await processVideo(src, dir);
+        const r = await this.processVideoAt(src, dir);
         out.videos[m.sha256] = {
           sha256: m.sha256,
-          hlsFiles: listFiles(r.hlsDir).map((f) => relative(r.hlsDir, f)),
-          mp4: { file: relative(dir, r.mp4.path), sha256: r.mp4.sha256 },
-          poster: {
-            file: relative(dir, r.poster.path),
-            sha256: r.poster.sha256,
-            width: r.poster.width,
-            height: r.poster.height,
-          },
-          preview: { file: relative(dir, r.preview.path), sha256: r.preview.sha256 },
+          hlsFiles: listFiles(join(dir, r.hlsDir)).map((f) => relative(join(dir, r.hlsDir), f)),
+          mp4: { file: r.mp4.path, sha256: r.mp4.sha256 },
+          poster: { file: r.poster.path, sha256: r.poster.sha256, width: r.poster.width, height: r.poster.height },
+          preview: { file: r.preview.path, sha256: r.preview.sha256 },
           durationSec: r.durationSec,
           width: r.width,
           height: r.height,
         };
-        writeFileSync(join(dir, "hlsdir"), relative(dir, r.hlsDir));
+        writeFileSync(join(dir, "hlsdir"), r.hlsDir);
       }
     }
     return out;
+  }
+
+  /**
+   * Process one image into `dir` (writes `original` and `<width>.webp`). With MEDIA_URL set this runs in the isolated
+   * media container (no secrets, no internet); otherwise in-process (development).
+   */
+  private async processImageAt(src: string, dir: string) {
+    if (this.d.config.mediaUrl) {
+      const r = await this.remoteMedia("image", src, dir);
+      return {
+        originalSha256: r.original.sha256 as string,
+        mime: r.original.mime as string,
+        width: r.original.width as number,
+        height: r.original.height as number,
+        blurhash: r.blurhash as string,
+        variants: r.variants as ImageOut["variants"],
+      };
+    }
+    const r = await processImage(new Uint8Array(readFileSync(src)));
+    writeFileSync(join(dir, "original"), r.original.bytes);
+    const variants: ImageOut["variants"] = {};
+    for (const [w, v] of Object.entries(r.variants)) {
+      if (!v) continue;
+      writeFileSync(join(dir, `${w}.webp`), v.bytes);
+      variants[w] = { file: `${w}.webp`, sha256: v.sha256, width: v.width, height: v.height };
+    }
+    const o = r.original;
+    return { originalSha256: o.sha256, mime: o.mime, width: o.width, height: o.height, blurhash: r.blurhash, variants };
+  }
+
+  /** Process one video into `dir`; all returned paths are relative to `dir`. */
+  private async processVideoAt(src: string, dir: string) {
+    if (this.d.config.mediaUrl) return (await this.remoteMedia("video", src, dir)) as Awaited<ReturnType<typeof processVideo>>;
+    const r = await processVideo(src, dir);
+    const rel = (p: string) => relative(dir, p);
+    return {
+      ...r,
+      hlsDir: rel(r.hlsDir),
+      mp4: { ...r.mp4, path: rel(r.mp4.path) },
+      poster: { ...r.poster, path: rel(r.poster.path) },
+      preview: { ...r.preview, path: rel(r.preview.path) },
+    };
+  }
+
+  private async remoteMedia(kind: "image" | "video", src: string, dir: string): Promise<any> {
+    const base = this.d.config.workDir;
+    const res = await (this.d.fetch ?? fetch)(`${this.d.config.mediaUrl!.replace(/\/+$/, "")}/process`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind, input: relative(base, src), outDir: relative(base, dir) }),
+      signal: AbortSignal.timeout(kind === "video" ? 24 * 3600_000 : 300_000),
+    });
+    const body = (await res.json()) as any;
+    if (res.status === 422) throw new PolicyError(`media worker refused the ${kind}: ${body.message}`);
+    if (!res.ok) throw new Error(`media worker: HTTP ${res.status} ${body.message ?? ""}`);
+    return body;
   }
 
   // ---- 4. IPFS on our own nodes (spec §6 step 3) ----
@@ -413,21 +501,24 @@ export class Pipeline {
     const blocks: Block[] = body.blocks.map((b): Block => {
       switch (b.type) {
         case "text":
+          return { type: "text", markdown: lt(b.markdown) };
         case "embed-story":
-          return b;
+          return b.version === undefined
+            ? { type: "embed-story", storyId: b.storyId }
+            : { type: "embed-story", storyId: b.storyId, version: b.version };
         case "image":
           return {
             type: "image",
-            items: b.items.map((i) => ({ ...imageFields(i.sha256), ...(i.caption ? { caption: i.caption } : {}) })),
+            items: b.items.map((i) => ({ ...imageFields(i.sha256), ...(i.caption ? { caption: lt(i.caption) } : {}) })),
           };
         case "video": {
           const v = media.videos[b.source.sha256]!;
           const c = ipfs.videos[b.source.sha256]!;
           return {
             type: "video",
-            source: b.source,
-            ...(b.title ? { title: b.title } : {}),
-            ...(b.description ? { description: b.description } : {}),
+            source: { sha256: b.source.sha256 },
+            ...(b.title ? { title: lt(b.title) } : {}),
+            ...(b.description ? { description: lt(b.description) } : {}),
             hls: `${c.hlsDir}/master.m3u8`,
             mp4: { cid: c.mp4, sha256: v.mp4.sha256 },
             poster: { cid: c.poster, sha256: v.poster.sha256 },
@@ -444,17 +535,17 @@ export class Pipeline {
       version: body.version,
       supersedes: body.supersedes,
       language: body.language,
-      title: body.title,
-      summary: body.summary,
-      tags: body.tags,
-      contributor: body.contributor,
+      title: lt(body.title),
+      summary: lt(body.summary),
+      tags: [...body.tags],
+      contributor: { pubkey: body.contributor.pubkey, displayName: body.contributor.displayName },
       blocks,
       approval: row.approval,
       publishedAt,
       publisher: hexToNpub(getPublicKey(this.d.config.publisherSecretKey)),
     };
     if (body.cover) manifest.cover = imageFields(body.cover.sha256);
-    if (body.location) manifest.location = body.location;
+    if (body.location) manifest.location = lt(body.location);
 
     const v = validateManifest(manifest);
     if (!v.ok) throw new Error(`built manifest is invalid: ${v.errors.join("; ")}`);
@@ -478,7 +569,32 @@ export class Pipeline {
     const path = this.work(row.id, "manifest.json");
     const bytes = existsSync(path) ? new Uint8Array(readFileSync(path)) : await this.d.ipfs.cat(r.cid);
     if (!hexEquals(sha256Hex(bytes), r.sha256)) throw new Error("stored manifest does not match its hash");
-    return { manifest: JSON.parse(new TextDecoder().decode(bytes)), bytes, cid: r.cid };
+    const manifest: Manifest = JSON.parse(new TextDecoder().decode(bytes));
+    await this.assertManifestSound(row, manifest, r.sha256);
+    return { manifest, bytes, cid: r.cid };
+  }
+
+  /**
+   * Before anything is signed with the publisher's keys, re-derive that the manifest is exactly what a moderator
+   * approved for this submission. The job row alone is not trusted: whoever can write the database must not be able
+   * to get arbitrary content signed (security review #8).
+   */
+  private async assertManifestSound(row: SubmissionRow, m: Manifest, sha: string): Promise<void> {
+    const v = validateManifest(m);
+    if (!v.ok) throw new PolicyError(`manifest invalid: ${v.errors.join("; ")}`);
+    if (!hexEquals(manifestSha256(m), sha)) throw new PolicyError("manifest is not canonical");
+    if (m.id !== row.story_id || m.version !== row.version || m.supersedes !== (row.supersedes ?? null))
+      throw new PolicyError("manifest id/version/supersedes differ from the submission");
+    if (npubToHex(m.contributor.pubkey) !== row.contributor) throw new PolicyError("manifest contributor differs");
+    if (canonicalize(m.approval) !== canonicalize(row.approval)) throw new PolicyError("manifest approval differs");
+    if (!hexEquals(approvalBodySha256(m), row.approval_body_sha256))
+      throw new PolicyError("manifest content differs from what the moderator approved");
+    if (!verifyApprovalSignature(m, m.approval)) throw new PolicyError("approval signature does not verify");
+    const lists = await this.lists();
+    if (!wasModeratorAt(lists, m.approval.moderator, Math.floor(Date.parse(m.approval.approvedAt) / 1000)))
+      throw new PolicyError("approver was not a moderator at approval time");
+    if (npubToHex(m.publisher) !== getPublicKey(this.d.config.publisherSecretKey))
+      throw new PolicyError("manifest names a different publisher");
   }
 
   // ---- 7. Nostr (spec §6 step 7) ----
@@ -515,6 +631,7 @@ export class Pipeline {
     const chain = this.d.config.chains.find((c) => c.key === key);
     if (!chain) throw new Error(`chain ${key} is not configured`);
     const r = steps.manifest!.result as { cid: string; sha256: string };
+    await this.manifestObj(row, steps); // re-verifies before anything is signed
     const stepName = `chain:${key}`;
     const pendingTx = (steps[stepName]?.result as { pendingTx?: `0x${string}` } | undefined)?.pendingTx;
     return writeReceipt({

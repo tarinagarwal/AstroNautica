@@ -15,8 +15,9 @@ export interface ReceiptResult {
 }
 
 /**
- * Write the tamper-proof receipt to one chain (spec §6 step 8). Idempotent: if the registry already holds a receipt
- * for (story, version) with the same hash we're done; a different hash is a hard error (should be impossible).
+ * Write the tamper-proof receipt to one chain (spec §6 step 8). Receipts are stored per writer, so a retired or
+ * compromised key can't squat ours. Idempotent: if our key already wrote a receipt for (story, version) with the same
+ * hash we're done; a different hash is a hard error (should be impossible).
  * `onSent` is called with the transaction hash before waiting, so a crash mid-wait can resume by hash.
  */
 export async function writeReceipt(args: {
@@ -48,7 +49,7 @@ export async function writeReceipt(args: {
       address: args.chain.registry,
       abi: registryAbi,
       functionName: "receipt",
-      args: [storyId, args.version],
+      args: [storyId, args.version, account.address],
     })) as readonly [Hex, bigint];
     if (BigInt(onChainSha) === 0n) return null;
     if (onChainSha.toLowerCase() !== sha.toLowerCase())

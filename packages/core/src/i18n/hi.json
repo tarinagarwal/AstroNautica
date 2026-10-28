@@ -33,6 +33,7 @@
   "verify.publisher": "प्रकाशक का हस्ताक्षर",
   "comments.title": "टिप्पणियाँ",
   "comments.count": "{count} टिप्पणियाँ",
+  "comments.countOne": "1 टिप्पणी",
   "comments.placeholder": "टिप्पणी लिखें",
   "comments.post": "भेजें",
   "comments.reply": "जवाब दें",

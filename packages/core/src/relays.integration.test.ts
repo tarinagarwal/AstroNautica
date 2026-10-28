@@ -18,3 +18,39 @@ describe.skipIf(RELAYS.length === 0)("RelayPool against real relays (set TEST_RE
     pool.close();
   }, 20_000);
 });
+
+describe("RelayPool against a hostile relay (no real relay needed)", () => {
+  it("a forged copy from one relay cannot hide the genuine event served by another", async () => {
+    const { WebSocketServer } = await import("ws");
+    const k = generateKeyPair();
+    const genuine = createListEvent("relays", [{ url: "wss://x.example", operator: "own" }], k.secretKey);
+    const forged = { ...genuine, content: "{}", sig: "00".repeat(64) };
+    const serve = (port: number, ev: unknown, delayMs: number) => {
+      const wss = new WebSocketServer({ port, host: "127.0.0.1" });
+      wss.on("connection", (ws) =>
+        ws.on("message", (m) => {
+          const msg = JSON.parse(m.toString());
+          if (msg[0] !== "REQ") return;
+          setTimeout(() => {
+            ws.send(JSON.stringify(["EVENT", msg[1], ev]));
+            ws.send(JSON.stringify(["EOSE", msg[1]]));
+          }, delayMs);
+        }),
+      );
+      return wss;
+    };
+    const hostile = serve(17981, forged, 0);
+    const honest = serve(17982, genuine, 200);
+    const pool = new RelayPool({ websocketImplementation: WebSocket });
+    const got = await pool.query(
+      ["ws://127.0.0.1:17981", "ws://127.0.0.1:17982"],
+      { kinds: [KIND_APP_DATA], authors: [k.pubkey] },
+      3000,
+    );
+    pool.close();
+    hostile.close();
+    honest.close();
+    expect(got.map((e) => e.id)).toEqual([genuine.id]);
+    expect(got[0]!.sig).toBe(genuine.sig);
+  }, 10_000);
+});

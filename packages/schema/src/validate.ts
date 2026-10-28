@@ -51,6 +51,7 @@ export function validateManifest(manifest: unknown, limits: Limits = DEFAULT_LIM
     v.check(isTime(m.publishedAt), "publishedAt must be an RFC 3339 UTC time");
     const a = m.approval;
     if (v.check(isObject(a), "approval is required")) {
+      v.keys("approval", a as unknown as Record<string, unknown>, ["moderator", "approvedAt", "signature"]);
       v.check(isNpub(a.moderator), "approval.moderator must be an npub");
       v.check(isTime(a.approvedAt), "approval.approvedAt must be an RFC 3339 UTC time");
       v.check(typeof a.signature === "string" && HEX_SIG.test(a.signature), "approval.signature must be 64-byte hex");
@@ -67,6 +68,12 @@ class Validator {
     return this.errors.length ? { ok: false, errors: this.errors } : { ok: true };
   }
 
+  /** Reject any key not in `allowed`: nothing a moderator didn't see may ride along into a signed manifest. */
+  keys(at: string, obj: Record<string, unknown>, allowed: readonly string[]): void {
+    for (const k of Object.keys(obj))
+      if (!allowed.includes(k)) this.errors.push(`${at}${at ? "." : ""}${k} is not allowed`);
+  }
+
   check(cond: boolean, msg: string): boolean {
     if (!cond) this.errors.push(msg);
     return cond;
@@ -75,6 +82,7 @@ class Validator {
   /** Returns false if the input isn't even an object (so callers can stop). */
   body(m: Manifest | ApprovalBody, full: boolean): boolean {
     if (!this.check(isObject(m), "manifest must be an object")) return false;
+    this.keys("", m as unknown as Record<string, unknown>, full ? TOP_MANIFEST : TOP_BODY);
     const L = this.limits;
     this.check(m.schema === STORY_SCHEMA, `schema must be "${STORY_SCHEMA}"`);
     this.check(isUuidv7(m.id), "id must be a UUIDv7");
@@ -98,6 +106,7 @@ class Validator {
     }
 
     if (this.check(isObject(m.contributor), "contributor is required")) {
+      this.keys("contributor", m.contributor as unknown as Record<string, unknown>, ["pubkey", "displayName"]);
       this.check(isNpub(m.contributor.pubkey), "contributor.pubkey must be an npub");
       this.check(
         typeof m.contributor.displayName === "string" && m.contributor.displayName.length <= 80,
@@ -106,6 +115,9 @@ class Validator {
     }
 
     if (m.cover !== undefined && this.check(isObject(m.cover), "cover must be an object")) {
+      this.keys("cover", m.cover as unknown as Record<string, unknown>, full ? COVER_KEYS.full : COVER_KEYS.body);
+      if (full && m.cover && (m.cover as any).variants !== undefined)
+        this.variants("cover.variants", (m.cover as any).variants);
       this.check(isSha256Hex(m.cover.sha256), "cover.sha256 must be a sha256");
       if (full) this.check(isCidV1((m.cover as Manifest["cover"])!.cid), "cover.cid must be a CIDv1");
     }
@@ -119,6 +131,8 @@ class Validator {
 
   block(b: Record<string, any>, at: string, lang: StoryLanguage, full: boolean): void {
     if (!this.check(isObject(b), `${at} must be an object`)) return;
+    const allowed = BLOCK_KEYS[b.type];
+    if (allowed) this.keys(at, b, full ? allowed.full : allowed.body);
     switch (b.type) {
       case "text":
         this.text(`${at}.markdown`, b.markdown, lang, true, 200_000);
@@ -133,6 +147,8 @@ class Validator {
         items.forEach((it: Record<string, any>, j: number) => {
           const p = `${at}.items[${j}]`;
           if (!this.check(isObject(it), `${p} must be an object`)) return;
+          this.keys(p, it, full ? IMAGE_KEYS.full : IMAGE_KEYS.body);
+          if (full && it.variants !== undefined) this.variants(`${p}.variants`, it.variants);
           this.check(isSha256Hex(it.sha256), `${p}.sha256 must be a sha256`);
           if (it.caption !== undefined) this.text(`${p}.caption`, it.caption, lang, true, 1000);
           if (full) {
@@ -166,8 +182,17 @@ class Validator {
     }
   }
 
+  variants(at: string, v: unknown): void {
+    if (!this.check(isObject(v), `${at} must be an object`)) return;
+    for (const [k, cid] of Object.entries(v as Record<string, unknown>)) {
+      this.check(["480", "960", "1600"].includes(k), `${at}.${k} is not a known width`);
+      this.check(isCidV1(cid), `${at}.${k} must be a CIDv1`);
+    }
+  }
+
   fileRef(at: string, f: Record<string, any>): void {
     if (!this.check(isObject(f), `${at} is required`)) return;
+    this.keys(at, f, ["cid", "sha256"]);
     this.check(isCidV1(f.cid), `${at}.cid must be a CIDv1`);
     this.check(isSha256Hex(f.sha256), `${at}.sha256 must be a sha256`);
   }
@@ -198,6 +223,36 @@ class Validator {
       );
   }
 }
+
+const TOP_BODY = [
+  "schema",
+  "id",
+  "version",
+  "supersedes",
+  "language",
+  "title",
+  "summary",
+  "cover",
+  "tags",
+  "location",
+  "contributor",
+  "blocks",
+];
+const TOP_MANIFEST = [...TOP_BODY, "approval", "publishedAt", "publisher"];
+const BLOCK_KEYS: Record<string, { body: string[]; full: string[] }> = {
+  text: { body: ["type", "markdown"], full: ["type", "markdown"] },
+  image: { body: ["type", "items"], full: ["type", "items"] },
+  video: {
+    body: ["type", "source", "title", "description"],
+    full: ["type", "source", "title", "description", "hls", "mp4", "poster", "preview", "magnet", "durationSec"],
+  },
+  "embed-story": { body: ["type", "storyId", "version"], full: ["type", "storyId", "version"] },
+};
+const IMAGE_KEYS = {
+  body: ["sha256", "caption"],
+  full: ["sha256", "caption", "cid", "width", "height", "blurhash", "variants"],
+};
+const COVER_KEYS = { body: ["sha256"], full: ["sha256", "cid", "variants", "width", "height", "blurhash"] };
 
 function isObject(x: unknown): x is Record<string, any> {
   return typeof x === "object" && x !== null && !Array.isArray(x);

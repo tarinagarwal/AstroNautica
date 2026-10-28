@@ -25,6 +25,7 @@ import {
   wasModeratorAt,
   wasPublisherAt,
   verifyApprovalSignature,
+  wasPublisherEvmAt,
 } from "@azaadawaaz/core";
 import { bytes16ToStoryId, hexEquals, manifestSha256, sha256Hex, validateManifest } from "@azaadawaaz/schema";
 
@@ -32,7 +33,35 @@ import { bytes16ToStoryId, hexEquals, manifestSha256, sha256Hex, validateManifes
  * Fetch a CAR for `cid` from trustless gateways, verify every block against its hash and check the DAG is complete.
  * Returns the root CID and blocks (root block first).
  */
-export async function fetchVerifiedCar(cid, ipfsGateways, board = new GatewayScoreboard()) {
+/** Read a response body, aborting once it exceeds `max` bytes (a hostile gateway can't exhaust memory). */
+export async function readCapped(res, max) {
+  const len = Number(res.headers.get("content-length") ?? "0");
+  if (len > max) throw new Error(`response larger than ${max} bytes`);
+  const reader = res.body.getReader();
+  const parts = [];
+  let n = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    n += value.length;
+    if (n > max) {
+      await reader.cancel();
+      throw new Error(`response larger than ${max} bytes`);
+    }
+    parts.push(value);
+  }
+  const out = new Uint8Array(n);
+  let off = 0;
+  for (const p of parts) {
+    out.set(p, off);
+    off += p.length;
+  }
+  return out;
+}
+
+export const MAX_CAR_BYTES = 3 * 1024 * 1024 * 1024;
+
+export async function fetchVerifiedCar(cid, ipfsGateways, board = new GatewayScoreboard(), maxBytes = MAX_CAR_BYTES) {
   const root = CID.parse(cid);
   for (const gw of board.order(ipfsGateways, (g) => g)) {
     try {
@@ -42,7 +71,7 @@ export async function fetchVerifiedCar(cid, ipfsGateways, board = new GatewaySco
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blocks = new Map();
-      const it = await CarBlockIterator.fromBytes(new Uint8Array(await res.arrayBuffer()));
+      const it = await CarBlockIterator.fromBytes(await readCapped(res, maxBytes));
       for await (const { cid: bc, bytes } of it) {
         if (bc.multihash.code !== mfSha256.code) throw new Error(`unsupported hash in block ${bc}`);
         const digest = await mfSha256.digest(bytes);
@@ -170,6 +199,7 @@ export async function pinCid(cid, pinTo) {
  * @param {boolean} [o.includeSocial] also copy comments and reactions when republishing
  * @param {object[]} [o.extraListEvents] previously verified list events (last good copy)
  * @param {(...a: unknown[]) => void} [o.say] progress logger
+ * @param {GatewayScoreboard} [o.board] gateway scoreboard kept across runs (mirror-sync)
  */
 export async function rebuildArchive(o) {
   const { owner, relays, gateways, arweaveUrl, pinTo, outDir } = o;
@@ -226,7 +256,7 @@ export async function rebuildArchive(o) {
   // ---------- every version from the chain registries ----------
   const versions = new Map(); // `${storyId}:${version}` → { storyId, version, sha, cid, chains: [] }
   const published = parseAbiItem(
-    "event Published(bytes16 indexed storyId, uint32 version, bytes32 manifestSha256, string manifestCid, uint64 timestamp)",
+    "event Published(bytes16 indexed storyId, uint32 indexed version, address indexed publisher, bytes32 manifestSha256, string manifestCid, uint64 timestamp)",
   );
   for (const c of chains) {
     try {
@@ -237,7 +267,13 @@ export async function rebuildArchive(o) {
         fromBlock: BigInt(c.fromBlock ?? 0),
         toBlock: "latest",
       });
+      let ignored = 0;
       for (const l of logs) {
+        // Only receipts written by a publisher EVM key that was valid at that block time count (security review #10).
+        if (!wasPublisherEvmAt(lists, l.args.publisher, Number(l.args.timestamp))) {
+          ignored++;
+          continue;
+        }
         const storyId = bytes16ToStoryId(l.args.storyId);
         const key = `${storyId}:${l.args.version}`;
         const sha = l.args.manifestSha256.slice(2);
@@ -252,7 +288,9 @@ export async function rebuildArchive(o) {
         v.chains.push(c.key);
         versions.set(key, v);
       }
-      say(`chain ${c.key}: ${logs.length} receipts`);
+      say(
+        `chain ${c.key}: ${logs.length - ignored} valid receipts${ignored ? `, ${ignored} from keys not valid at the time (ignored)` : ""}`,
+      );
     } catch (e) {
       problem(`chain ${c.key} unreachable: ${e.message}`);
     }
@@ -272,27 +310,32 @@ export async function rebuildArchive(o) {
   }
 
   // ---------- fetching ----------
-  const board = new GatewayScoreboard();
+  const board = o.board ?? new GatewayScoreboard();
 
   const fetchCar = (cid) => fetchVerifiedCar(cid, ipfsGateways, board);
   const importCar = (blocks) => importCarInto(blocks, pinTo);
   const pinRoot = (cid) => pinCid(cid, pinTo);
 
   /** Fetch one content-addressed object (file or directory); verify; optionally pin; return file bytes when asked. */
-  async function restore(cid, expectSha, label, wantBytes = false) {
+  /**
+   * Fetch one content-addressed object (file or directory) and verify it. Only verified content is imported and
+   * pinned; with `commit: false` the caller checks more first and then calls `commit()` (security review #9).
+   */
+  async function restore(cid, expectSha, label, wantBytes = false, commitNow = true) {
     try {
       const { root, blocks } = await fetchCar(cid);
-      await importCar([
-        blocks.find((b) => b.cid.equals(root)) ?? blocks[0],
-        ...blocks.filter((b) => !b.cid.equals(root)),
-      ]);
-      await pinRoot(cid);
       let bytes;
       if (expectSha || wantBytes) {
         bytes = fileBytes(root, blocks);
         if (expectSha && !hexEquals(sha256Hex(bytes), expectSha))
           throw new Error(`content of ${cid} does not match sha256`);
       }
+      const commit = async () => {
+        await importCar(blocks);
+        await pinRoot(cid);
+      };
+      if (commitNow) await commit();
+      else pendingCommit = commit;
       report.files++;
       if (outDir && bytes) {
         mkdirSync(join(outDir, "files"), { recursive: true });
@@ -335,13 +378,16 @@ export async function rebuildArchive(o) {
     }
   }
 
+  let pendingCommit = null;
+
   // ---------- rebuild every version ----------
   const sorted = [...versions.values()].sort((a, b) => a.storyId.localeCompare(b.storyId) || a.version - b.version);
   const storiesSeen = new Set();
   for (const v of sorted) {
     const label = `${v.storyId} v${v.version}`;
     say(`• ${label}`);
-    const bytes = await restore(v.cid, v.sha, `${label} manifest`, true);
+    pendingCommit = null;
+    const bytes = await restore(v.cid, v.sha, `${label} manifest`, true, false);
     if (!bytes) continue;
     let m;
     try {
@@ -350,22 +396,35 @@ export async function rebuildArchive(o) {
       problem(`${label}: manifest is not JSON`);
       continue;
     }
+    const bad = [];
     const ref = latest.find((s) => s.storyId === v.storyId && s.version === v.version);
     if (ref) {
       const check = verifyManifest(bytes, ref, lists);
-      if (!check.ok) problem(`${label}: manifest verification failed: ${check.errors.join("; ")}`);
+      if (!check.ok) bad.push(`manifest verification failed: ${check.errors.join("; ")}`);
     } else {
       // Superseded versions: no relay event, so check everything except the event binding.
       const val = validateManifest(m);
-      if (!val.ok) problem(`${label}: invalid manifest: ${val.errors.join("; ")}`);
+      if (!val.ok) bad.push(`invalid manifest: ${val.errors.join("; ")}`);
       else {
-        if (!hexEquals(manifestSha256(m), v.sha)) problem(`${label}: manifest is not canonical`);
-        if (m.id !== v.storyId || m.version !== v.version) problem(`${label}: id/version mismatch`);
-        if (!verifyApprovalSignature(m, m.approval)) problem(`${label}: approval signature invalid`);
+        if (!hexEquals(manifestSha256(m), v.sha)) bad.push("manifest is not canonical");
+        if (m.id !== v.storyId || m.version !== v.version) bad.push("id/version mismatch");
+        if (!verifyApprovalSignature(m, m.approval)) bad.push("approval signature invalid");
         if (!wasModeratorAt(lists, m.approval.moderator, Date.parse(m.approval.approvedAt) / 1000))
-          problem(`${label}: approver was not a moderator at the time`);
-        if (!wasPublisherAt(lists, m.publisher, Date.parse(m.publishedAt) / 1000))
-          problem(`${label}: publisher key not valid then`);
+          bad.push("approver was not a moderator at the time");
+        if (!wasPublisherAt(lists, m.publisher, Date.parse(m.publishedAt) / 1000, v.sha))
+          bad.push("publisher key not valid then");
+      }
+    }
+    if (bad.length) {
+      // Nothing from a manifest that fails verification is pinned or served (security review #9).
+      for (const b of bad) problem(`${label}: ${b}`);
+      continue;
+    }
+    if (pendingCommit) {
+      try {
+        await pendingCommit();
+      } catch (e) {
+        problem(`${label} manifest: ${e.message}`);
       }
     }
     if (outDir) {

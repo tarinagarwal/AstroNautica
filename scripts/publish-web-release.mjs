@@ -40,7 +40,10 @@ async function addDir(api) {
   const url = `${api.replace(/\/+$/, "")}/api/v0/add?cid-version=1&raw-leaves=true&chunker=size-262144&pin=true&wrap-with-directory=false`;
   const res = await fetch(url, { method: "POST", body: form });
   if (!res.ok) throw new Error(`${api}: HTTP ${res.status} ${await res.text()}`);
-  const lines = (await res.text()).trim().split("\n").map((l) => JSON.parse(l));
+  const lines = (await res.text())
+    .trim()
+    .split("\n")
+    .map((l) => JSON.parse(l));
   const root = lines.find((l) => l.Name === "web");
   if (!root) throw new Error(`${api}: no directory CID in response`);
   return root.Hash;

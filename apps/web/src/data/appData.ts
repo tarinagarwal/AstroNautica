@@ -4,7 +4,7 @@
  * hash from the fastest gateway and checked with `verifyManifest`. Framework-free so it can be tested directly.
  */
 import { KIND_APP_DATA, KIND_STORY, MODERATOR_LISTS, OWNER_LISTS, listD, storageD } from "@core/kinds.js";
-import { buildEffectiveLists, type EffectiveLists } from "@core/lists.js";
+import { buildEffectiveLists, observeListEntries, type EffectiveLists, type FirstSeen } from "@core/lists.js";
 import {
   parseStorageReceipt,
   selectStories,
@@ -40,6 +40,12 @@ export class AppData {
   readonly listEvents = new Map<string, Event>();
   readonly storyEvents = new Map<string, Event>();
   lists: EffectiveLists | null = null;
+  /**
+   * When this browser first saw each moderator-list entry. Moderators write their own `addedAt`, so the daily caps on
+   * unlisting/hiding use the later of the two (core decision D18). Persisted in IndexedDB.
+   */
+  private firstSeen: FirstSeen = new Map();
+  private firstSeenLoaded = false;
   stories: StoryRef[] = [];
   listsStatus: ListsStatus = "loading";
   storiesLoaded = false;
@@ -97,7 +103,10 @@ export class AppData {
       this.listsStatus = "none";
       return;
     }
-    this.lists = buildEffectiveLists(this.owner, [...this.listEvents.values()]);
+    const events = [...this.listEvents.values()];
+    observeListEntries(events, this.firstSeen);
+    this.lists = buildEffectiveLists(this.owner, events, { firstSeen: this.firstSeen });
+    if (this.firstSeenLoaded) void idbSet("lists:firstSeen", [...this.firstSeen.entries()]);
     setGateways(this.lists.gateways);
     const hasOwnerLists =
       this.lists.relays.length > 0 || this.lists.gateways.length > 0 || this.lists.moderators.length > 0;
@@ -109,6 +118,9 @@ export class AppData {
   /** Load bundled and cached data, then refresh from the network in the background. */
   async init(): Promise<void> {
     this.addListEvents(this.config.listEvents);
+    const seen = await idbGet<[string, number][]>("lists:firstSeen");
+    if (seen) for (const [k, v] of seen) if (!this.firstSeen.has(k) || this.firstSeen.get(k)! > v) this.firstSeen.set(k, v);
+    this.firstSeenLoaded = true;
     const cached = await idbGet<Event[]>("lists:events");
     if (cached) this.addListEvents(cached);
     const cachedStories = await idbGet<Event[]>("stories:events");

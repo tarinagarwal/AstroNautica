@@ -13,8 +13,7 @@ RUN pnpm install --frozen-lockfile --filter "@azaadawaaz/publisher..." \
  && pnpm --filter @azaadawaaz/publisher deploy --prod --legacy /out
 
 FROM node:22-bookworm-slim
-# ffmpeg for video processing (the media library runs in-process with sandboxed child processes).
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates && rm -rf /var/lib/apt/lists/*
+# No ffmpeg here on purpose: in production media is processed by the isolated media container (MEDIA_URL).
 WORKDIR /app
 COPY --from=build /out /app
 USER node

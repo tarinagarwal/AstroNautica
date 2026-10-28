@@ -9,7 +9,7 @@ import { useApp } from "../data/context.js";
 import { useI18n } from "../i18n/index.js";
 import { StoryBody, StoryHeader } from "../components/StoryView.js";
 import { StoryLangSwitch } from "./StoryPage.js";
-import { findPublishedCid } from "../lib/eth.js";
+import { findPublishedCid, publisherWindows } from "../lib/eth.js";
 import { arweaveLinks, gatewayLinks } from "../lib/gateways.js";
 
 type State =
@@ -46,7 +46,12 @@ export default function VersionPage() {
       const tx = receipt?.arweave[sha];
       let cid: string | undefined;
       for (const v of receipt ? [receipt.version] : versions.reverse()) {
-        const found = await findPublishedCid(app.config.chains, id, v).catch(() => undefined);
+        const found = await findPublishedCid(
+          app.config.chains,
+          id,
+          v,
+          publisherWindows(app.lists?.serviceKeys ?? []),
+        ).catch(() => undefined);
         if (found && found.sha === sha) {
           cid = found.cid;
           break;
@@ -74,7 +79,7 @@ export default function VersionPage() {
         m.id === id &&
         verifyApprovalSignature(m, m.approval) &&
         wasModeratorAt(lists, m.approval.moderator, Math.floor(Date.parse(m.approval.approvedAt) / 1000)) &&
-        wasPublisherAt(lists, m.publisher, Math.floor(Date.parse(m.publishedAt) / 1000));
+        wasPublisherAt(lists, m.publisher, Math.floor(Date.parse(m.publishedAt) / 1000), sha);
       if (!c) setState(ok ? { kind: "ok", manifest: m } : { kind: "invalid" });
     })();
     return () => {

@@ -1,6 +1,9 @@
 /**
- * Read AzaadAwaazRegistry receipts with plain JSON-RPC (no web3 library): `receipt(bytes16,uint32)` via eth_call and
- * the `Published` event via eth_getLogs for the transaction and block time (spec §8.1 Verify, §9).
+ * Read AzaadAwaazRegistry receipts with plain JSON-RPC (no web3 library): `receipt(bytes16,uint32,address)` via
+ * eth_call and the `Published` event via eth_getLogs for the transaction (spec §8.1 Verify, §9).
+ *
+ * Receipts are stored per writer. A receipt counts only if its writer was the publisher's EVM key on the owner-signed
+ * service-keys list at the receipt's block time, which the writer cannot choose (security review #10).
  */
 import { chainById, registryAbi } from "@azaadawaaz/contracts";
 import { keccak_256 } from "@noble/hashes/sha3.js";
@@ -24,9 +27,16 @@ export const PUBLISHED_TOPIC = "0x" + bytesToHex(keccak_256(utf8ToBytes(PUBLISHE
 
 const pad = (hex: string, right = false) => (right ? hex.padEnd(64, "0") : hex.padStart(64, "0"));
 
-export function encodeReceiptCall(storyId: string, version: number): string {
+export function encodeReceiptCall(storyId: string, version: number, by: string): string {
   const id = storyIdToBytes16(storyId).slice(2);
-  return RECEIPT_SELECTOR + pad(id, true) + pad(version.toString(16));
+  return RECEIPT_SELECTOR + pad(id, true) + pad(version.toString(16)) + pad(by.replace(/^0x/, "").toLowerCase());
+}
+
+/** An EVM address that served as publisher, with the window it was valid in (from the signed service-keys list). */
+export interface PublisherWindow {
+  address: string;
+  from: number;
+  until?: number;
 }
 
 /** The indexed bytes16 storyId topic (left-aligned in 32 bytes). */
@@ -80,18 +90,25 @@ interface Log {
   blockNumber: string;
 }
 
-/** Decode the non-indexed part of `Published`: (uint32 version, bytes32 sha, string cid, uint64 timestamp). */
-export function decodePublishedData(data: string): { version: number; sha: string; cid: string; timestamp: number } {
+/** Decode the non-indexed part of `Published`: (bytes32 sha, string cid, uint64 timestamp). */
+export function decodePublishedData(data: string): { sha: string; cid: string; timestamp: number } {
   const d = data.replace(/^0x/, "");
   const word = (i: number) => d.slice(i * 64, i * 64 + 64);
-  const version = parseInt(word(0), 16);
-  const sha = word(1);
-  const offset = parseInt(word(2), 16) / 32;
-  const timestamp = parseInt(word(3), 16);
+  const sha = word(0);
+  const offset = parseInt(word(1), 16) / 32;
+  const timestamp = parseInt(word(2), 16);
   const len = parseInt(word(offset), 16);
   const hex = d.slice((offset + 1) * 64, (offset + 1) * 64 + len * 2);
   const bytes = new Uint8Array(hex.match(/../g)?.map((h) => parseInt(h, 16)) ?? []);
-  return { version, sha, cid: new TextDecoder().decode(bytes), timestamp };
+  return { sha, cid: new TextDecoder().decode(bytes), timestamp };
+}
+
+/** Indexed topics of `Published`: storyId (bytes16, left-aligned), version and publisher (right-aligned). */
+export function versionTopic(version: number): string {
+  return "0x" + pad(version.toString(16));
+}
+export function addressTopic(address: string): string {
+  return "0x" + pad(address.replace(/^0x/, "").toLowerCase());
 }
 
 const rpcUrls = (c: ChainConfig) => [c.rpc, ...(c.rpcs ?? [])].filter(Boolean);
@@ -110,12 +127,12 @@ async function blockAt(c: ChainConfig, ts: number, f: RpcFetch): Promise<number>
   return lo;
 }
 
-async function findLog(c: ChainConfig, storyId: string, version: number, ts: number, f: RpcFetch) {
+async function findLog(c: ChainConfig, storyId: string, version: number, by: string, ts: number, f: RpcFetch) {
   const filter = (from: string, to: string) => ({
     address: c.registry,
     fromBlock: from,
     toBlock: to,
-    topics: [PUBLISHED_TOPIC, storyTopic(storyId)],
+    topics: [PUBLISHED_TOPIC, storyTopic(storyId), versionTopic(version), addressTopic(by)],
   });
   let logs: Log[];
   try {
@@ -129,82 +146,98 @@ async function findLog(c: ChainConfig, storyId: string, version: number, ts: num
       f,
     );
   }
-  for (const l of logs) {
-    const d = decodePublishedData(l.data);
-    if (d.version === version) return { log: l, decoded: d };
-  }
-  return undefined;
+  const l = logs[0];
+  return l ? { log: l, decoded: decodePublishedData(l.data) } : undefined;
 }
 
-/** Check one chain's receipt for (storyId, version) against the expected manifest hash. */
+/** Read the receipt written by `by`; null when there is none. */
+async function readReceipt(c: ChainConfig, storyId: string, version: number, by: string, f: RpcFetch) {
+  const result = await rpc<string>(
+    rpcUrls(c),
+    "eth_call",
+    [{ to: c.registry, data: encodeReceiptCall(storyId, version, by) }, "latest"],
+    f,
+  );
+  const d = (result ?? "").replace(/^0x/, "");
+  const sha = d.slice(0, 64);
+  if (!sha || /^0+$/.test(sha)) return null;
+  return { sha, timestamp: parseInt(d.slice(64, 128) || "0", 16) };
+}
+
+const validAt = (p: PublisherWindow, ts: number) => p.from <= ts && (p.until === undefined || ts < p.until);
+
+/**
+ * Check one chain's receipt for (storyId, version) against the expected manifest hash. Receipts are looked up for
+ * every publisher EVM key on the signed list; one counts only if written while that key was valid.
+ */
 export async function checkChainReceipt(
   c: ChainConfig,
   storyId: string,
   version: number,
   expectedSha256: string,
+  publishers: PublisherWindow[],
   f: RpcFetch = fetch,
 ): Promise<ChainReceipt> {
-  let result: string;
-  try {
-    result = await rpc<string>(
-      rpcUrls(c),
-      "eth_call",
-      [{ to: c.registry, data: encodeReceiptCall(storyId, version) }, "latest"],
-      f,
-    );
-  } catch {
-    return { chain: c, ok: false, error: "unreachable" };
-  }
-  const d = (result ?? "").replace(/^0x/, "");
-  const sha = d.slice(0, 64);
-  const timestamp = parseInt(d.slice(64, 128) || "0", 16);
-  if (!sha || /^0+$/.test(sha)) return { chain: c, ok: false, error: "not-found" };
-  const out: ChainReceipt = { chain: c, ok: sha === expectedSha256.toLowerCase(), manifestSha256: sha, timestamp };
-  if (!out.ok) out.error = "mismatch";
-  try {
-    const found = await findLog(c, storyId, version, timestamp, f);
-    if (found) {
-      out.txHash = found.log.transactionHash;
-      out.blockNumber = parseInt(found.log.blockNumber, 16);
-      out.manifestCid = found.decoded.cid;
-      const block = await rpc<{ timestamp: string }>(
-        rpcUrls(c),
-        "eth_getBlockByNumber",
-        [found.log.blockNumber, false],
-        f,
-      );
-      out.timestamp = parseInt(block.timestamp, 16);
+  let best: ChainReceipt | undefined;
+  let reached = false;
+  for (const p of publishers) {
+    let r: { sha: string; timestamp: number } | null;
+    try {
+      r = await readReceipt(c, storyId, version, p.address, f);
+      reached = true;
+    } catch {
+      continue;
     }
-  } catch {
-    // The receipt itself is what matters; the transaction lookup is informational.
+    if (!r || !validAt(p, r.timestamp)) continue;
+    const out: ChainReceipt = { chain: c, ok: r.sha === expectedSha256.toLowerCase(), manifestSha256: r.sha, timestamp: r.timestamp };
+    if (!out.ok) out.error = "mismatch";
+    if (out.ok || !best) best = out;
+    if (out.ok) {
+      try {
+        const found = await findLog(c, storyId, version, p.address, r.timestamp, f);
+        if (found) {
+          out.txHash = found.log.transactionHash;
+          out.blockNumber = parseInt(found.log.blockNumber, 16);
+          out.manifestCid = found.decoded.cid;
+        }
+      } catch {
+        // The receipt itself is what matters; the transaction lookup is informational.
+      }
+      break;
+    }
   }
-  return out;
+  if (best) return best;
+  return { chain: c, ok: false, error: reached || publishers.length === 0 ? "not-found" : "unreachable" };
 }
 
-/** The manifest CID and hash of a version from its chain receipt (used to find earlier versions). */
+/** The manifest CID and hash of a version from a valid chain receipt (used to find earlier versions). */
 export async function findPublishedCid(
   chains: ChainConfig[],
   storyId: string,
   version: number,
+  publishers: PublisherWindow[],
   f: RpcFetch = fetch,
 ): Promise<{ cid: string; sha: string } | undefined> {
   for (const c of chains) {
-    try {
-      const result = await rpc<string>(
-        rpcUrls(c),
-        "eth_call",
-        [{ to: c.registry, data: encodeReceiptCall(storyId, version) }, "latest"],
-        f,
-      );
-      const d = (result ?? "").replace(/^0x/, "");
-      if (!d.slice(0, 64) || /^0+$/.test(d.slice(0, 64))) continue;
-      const found = await findLog(c, storyId, version, parseInt(d.slice(64, 128) || "0", 16), f);
-      if (found) return { cid: found.decoded.cid, sha: found.decoded.sha };
-    } catch {
-      // try the next chain
+    for (const p of publishers) {
+      try {
+        const r = await readReceipt(c, storyId, version, p.address, f);
+        if (!r || !validAt(p, r.timestamp)) continue;
+        const found = await findLog(c, storyId, version, p.address, r.timestamp, f);
+        if (found && found.decoded.sha === r.sha) return { cid: found.decoded.cid, sha: r.sha };
+      } catch {
+        // try the next one
+      }
     }
   }
   return undefined;
+}
+
+/** Publisher EVM keys and their validity windows from the effective lists. */
+export function publisherWindows(serviceKeys: { role: string; evm?: string; from: number; until?: number }[]): PublisherWindow[] {
+  return serviceKeys
+    .filter((k) => k.role === "publisher" && k.evm)
+    .map((k) => ({ address: k.evm!, from: k.from, ...(k.until !== undefined ? { until: k.until } : {}) }));
 }
 
 export function chainName(c: ChainConfig): string {

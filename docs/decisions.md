@@ -70,3 +70,37 @@ from trustless gateways and every block is hash-checked, with the DAG walked for
 
 ## D16. Owner key files use Argon2id
 `scripts/gen-owner-key.mjs` encrypts with libsodium `crypto_pwhash` (Argon2id, moderate limits) and secretbox.
+
+## D17. Retired publisher keys count only for vouched manifests
+A Nostr event's `created_at` is chosen by its signer, so a stolen publisher key could backdate new events to before its
+`until`. Once a publisher key has `until`, clients accept its story events and storage receipts only for manifests in
+the owner-signed `vouched` list (`scripts/list-publisher-manifests.mjs` + `owner-sign-list.mjs vouched`). Chain
+receipts don't need this: their block time can't be faked (D19). (Security review #2.)
+
+## D18. Moderator list caps can't be dodged by backdating
+Moderators write each entry's `addedAt`. Effective time = clamp(addedAt, moderator's `from`, event time), raised to
+when this client first saw the entry (clients with storage persist "first seen"); a total cap per moderator per list
+applies regardless (unlisted 100, hidden 5000, muted 2000, featured 100, revoked-contributors 100). The publisher
+decides contributor revocation from the API database (owner action), not from any moderator's signed list.
+(Security review #4.)
+
+## D19. Registry receipts are stored per writer
+`receipt(storyId, version, by)`; `Published` indexes the publisher address. A retired or compromised key can't squat a
+version or block corrections, and clients trust a receipt only if `by` was the publisher EVM key on the signed list
+at the receipt's block time. Versions no longer need to increase strictly. (Security review #10.)
+
+## D20. Relays store only what the platform needs
+Our relays reject deletion (kind 5) and vanish (62) requests, accept stories and lists only from owner, publisher and
+moderator keys, audit events only from moderators, comments and reactions only with proof-of-work, and nothing else.
+(Security review #3, #6.)
+
+## D21. Media parsers run in an isolated container
+ffmpeg and libvips run in the `media` worker (no secrets, no internet, own user), reached by the publisher over an
+internal network and a shared volume. The publisher refuses to start in production without `MEDIA_URL`.
+(Security review #7.)
+
+## D22. The publisher re-proves a manifest before signing anything
+Before the story event, chain receipts and Arweave uploads, the publisher re-checks the manifest against the
+submission row and the moderator's approval signature, so database access alone can't get content signed. Policy
+failures (revoked contributor, removed moderator, tampered body) block the job and wipe the work directory instead of
+retrying forever. (Security review #5, #8, #14.)
