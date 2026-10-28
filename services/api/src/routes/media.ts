@@ -7,7 +7,7 @@ import { caller, type Ctx } from "../context.js";
 import { withTx } from "../db.js";
 import { HttpError, badRequest, conflict, notFound } from "../errors.js";
 import { TransitionError, canTransition, transition, type MediaItem, type SubmissionRow } from "../stateMachine.js";
-import { loadSubmission, parseId, readAccess } from "../submissions.js";
+import { assertNotExpired, loadSubmission, parseId, readAccess } from "../submissions.js";
 import { HEADER_BYTES, expectedChunkBytes, isSha, parseChunkIndex } from "../staging.js";
 
 type MediaParams = { id: string; sha256: string };
@@ -52,6 +52,7 @@ export function mediaRoutes(app: FastifyInstance, ctx: Ctx): void {
       const row = await loadSubmission(c, id, true);
       if (row.contributor !== pk) throw notFound("submission");
       if (!canTransition("upload", row.state)) throw new TransitionError("upload", row.state);
+      assertNotExpired(row);
       const m = findMedia(row, sha);
       const w = write(m);
       w.check();
@@ -124,6 +125,7 @@ export function mediaRoutes(app: FastifyInstance, ctx: Ctx): void {
       const row = await loadSubmission(c, id, true);
       if (row.contributor !== pk) throw notFound("submission");
       if (!canTransition("upload", row.state)) throw new TransitionError("upload", row.state);
+      assertNotExpired(row);
       const m = findMedia(row, sha);
       const r = await received(id, m);
       const have = new Set(r.chunks);

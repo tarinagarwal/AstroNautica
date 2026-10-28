@@ -2,7 +2,7 @@
 import type { FastifyRequest } from "fastify";
 import { getContributor } from "./auth.js";
 import { caller, type Ctx } from "./context.js";
-import type { Queryable } from "./db.js";
+import type { Client, Queryable } from "./db.js";
 import { HttpError, badRequest, forbidden, notFound } from "./errors.js";
 import type { MediaItem, SubmissionRow } from "./stateMachine.js";
 import { chunkCount, isUuid } from "./staging.js";
@@ -34,8 +34,17 @@ export async function readAccess(ctx: Ctx, req: FastifyRequest, row: SubmissionR
   throw notFound("submission");
 }
 
-/** Validate a media list against the configured limits. */
+/** Validate a media list against the configured limits (per item, item count and total bytes). */
 export function validateMedia(ctx: Ctx, media: Omit<MediaItem, "complete">[]): void {
+  if (media.length > ctx.maxMedia)
+    throw badRequest("too_many_media", `a submission may have at most ${ctx.maxMedia} media items`);
+  const total = media.reduce((n, m) => n + m.size, 0);
+  if (total > ctx.config.maxSubmissionBytes)
+    throw new HttpError(
+      413,
+      "submission_too_large",
+      `the media of one submission may total at most ${ctx.config.maxSubmissionBytes} bytes`,
+    );
   const seen = new Set<string>();
   for (const m of media) {
     if (seen.has(m.sha256)) throw badRequest("invalid_media", `media ${m.sha256} is listed twice`);
@@ -45,6 +54,42 @@ export function validateMedia(ctx: Ctx, media: Omit<MediaItem, "complete">[]): v
     if (m.chunks !== chunkCount(m.size))
       throw badRequest("invalid_media", `media ${m.sha256}: chunks must be ${chunkCount(m.size)} for ${m.size} bytes`);
   }
+}
+
+/**
+ * Staging quota per contributor: the declared media bytes of all their submissions whose staging data still exists and
+ * that are not in a final state (uploads are checked to match the declared sizes exactly, so this bounds the disk
+ * use). Locks the contributor row so concurrent creates/edits by one key are counted one after the other. Call inside
+ * the transaction that writes the new media list.
+ */
+export async function checkContributorQuota(
+  c: Client,
+  ctx: Ctx,
+  contributor: string,
+  media: Pick<MediaItem, "size">[],
+  exceptId?: string,
+): Promise<void> {
+  await c.query("SELECT 1 FROM contributors WHERE pubkey = $1 FOR UPDATE", [contributor]);
+  const r = await c.query<{ total: string }>(
+    `SELECT coalesce(sum((m->>'size')::bigint), 0)::text AS total
+     FROM submissions s CROSS JOIN LATERAL jsonb_array_elements(s.media) m
+     WHERE s.contributor = $1 AND s.id <> $2 AND s.staging_purged_at IS NULL
+       AND s.state NOT IN ('rejected', 'published', 'unlisted')`,
+    [contributor, exceptId ?? "00000000-0000-0000-0000-000000000000"],
+  );
+  const total = Number(r.rows[0]!.total) + media.reduce((n, m) => n + m.size, 0);
+  if (total > ctx.config.maxContributorStagingBytes)
+    throw new HttpError(
+      413,
+      "staging_quota_exceeded",
+      `your submissions in progress may hold at most ${ctx.config.maxContributorStagingBytes} bytes of media`,
+    );
+}
+
+/** Submissions expired by the retention job (DRAFT_RETENTION_DAYS) can no longer be edited, uploaded to or submitted. */
+export function assertNotExpired(row: Pick<SubmissionRow, "staging_purged_at">): void {
+  if (row.staging_purged_at)
+    throw new HttpError(410, "submission_expired", "this draft expired and its data was deleted; start a new one");
 }
 
 /**

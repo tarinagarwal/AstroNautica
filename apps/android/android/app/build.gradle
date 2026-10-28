@@ -1,0 +1,93 @@
+apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "com.facebook.react"
+
+react {
+    // pnpm workspace: the app root is apps/android; node_modules entries are symlinks resolved by Node.
+    root = file("../../")
+    reactNativeDir = file("../../node_modules/react-native")
+    codegenDir = file("../../node_modules/@react-native/codegen")
+    cliFile = file("../../node_modules/react-native/cli.js")
+    autolinkLibrariesWithApp()
+}
+
+/**
+ * Release signing comes only from the environment (scripts/create-release-keystore.sh makes the keystore outside
+ * git). Without these variables a release build is left unsigned and nothing secret is ever read from the repo.
+ */
+def env = System.getenv()
+def releaseSigning = env.AZAAD_KEYSTORE && env.AZAAD_KEYSTORE_PASSWORD && env.AZAAD_KEY_ALIAS
+
+android {
+    ndkVersion rootProject.ext.ndkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+    compileSdk rootProject.ext.compileSdkVersion
+
+    namespace "org.azaadawaaz.app"
+    defaultConfig {
+        applicationId "org.azaadawaaz.app"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode Integer.parseInt(env.AZAAD_VERSION_CODE ?: project.property("azaadVersionCode"))
+        versionName env.AZAAD_VERSION_NAME ?: project.property("azaadVersionName")
+    }
+    signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+        if (releaseSigning) {
+            release {
+                storeFile file(env.AZAAD_KEYSTORE)
+                storePassword env.AZAAD_KEYSTORE_PASSWORD
+                keyAlias env.AZAAD_KEY_ALIAS
+                keyPassword env.AZAAD_KEY_PASSWORD ?: env.AZAAD_KEYSTORE_PASSWORD
+                enableV1Signing true
+                enableV2Signing true
+                enableV3Signing true
+            }
+        }
+    }
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
+        release {
+            if (releaseSigning) signingConfig signingConfigs.release
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+        }
+    }
+    packagingOptions {
+        // JNA (used by lazysodium) ships its native libraries inside the AAR.
+        jniLibs { useLegacyPackaging = true }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = "17" }
+}
+
+dependencies {
+    implementation("com.facebook.react:react-android")
+    implementation("com.facebook.react:hermes-android")
+
+    // Tor and pluggable transports (Snowflake, obfs4) — Guardian Project, Maven Central.
+    implementation("info.guardianproject:tor-android:0.4.9.14")
+    implementation("com.netzarchitekten:IPtProxy:5.7.0")
+
+    // One HTTP stack with DNS-over-HTTPS. 4.x matches React Native's own OkHttp major version.
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0")
+
+    // libsodium for staging encryption (byte-compatible with libsodium-wrappers in packages/core).
+    implementation("com.goterl:lazysodium-android:5.2.0@aar")
+    implementation("net.java.dev.jna:jna:5.19.1@aar")
+
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.fragment:fragment-ktx:1.8.5")
+}

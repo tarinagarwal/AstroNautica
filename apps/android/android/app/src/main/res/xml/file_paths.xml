@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Files other apps may receive: story bundles to share and downloaded updates for the installer. -->
+<paths>
+    <cache-path name="bundles" path="bundles/" />
+    <cache-path name="updates" path="updates/" />
+</paths>

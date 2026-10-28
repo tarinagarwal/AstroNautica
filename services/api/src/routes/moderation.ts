@@ -7,7 +7,7 @@ import { storeAudit, verifyAuditEvent, type AuditAction } from "../audit.js";
 import { getContributor, isRevoked } from "../auth.js";
 import { caller, type Ctx } from "../context.js";
 import { withTx } from "../db.js";
-import { HttpError, badRequest, conflict } from "../errors.js";
+import { HttpError, badRequest, conflict, forbidden } from "../errors.js";
 import { consumeRate } from "../rateLimit.js";
 import {
   NOW,
@@ -20,13 +20,19 @@ import {
   type FeedbackEntry,
   type SubmissionRow,
 } from "../stateMachine.js";
-import { activeClaim, loadSubmission, parseId } from "../submissions.js";
+import { activeClaim, assertNotExpired, loadSubmission, parseId } from "../submissions.js";
 import { approveBody, auditBody, claimBody, feedbackBody, keysBody, parse, unlistBody } from "../validation.js";
 
 type Params = { id: string };
 
 /** How far an approval's `approvedAt` may be from the server clock. */
 export const APPROVAL_WINDOW_SEC = 600;
+
+/** Nobody decides on their own submission (a moderator or the owner who is also a contributor). */
+function assertNotOwnSubmission(row: Pick<SubmissionRow, "contributor">, moderator: string): void {
+  if (row.contributor === moderator)
+    throw forbidden("you cannot decide on your own submission; another moderator must review it");
+}
 
 export function moderationRoutes(app: FastifyInstance, ctx: Ctx): void {
   const moderator = { preHandler: [ctx.authenticate, ctx.require("moderator")] };
@@ -86,6 +92,7 @@ export function moderationRoutes(app: FastifyInstance, ctx: Ctx): void {
     const id = parseId(req.params.id);
     const b = parse(approveBody, req.body);
     const pre = await loadSubmission(ctx.pool, id);
+    assertNotOwnSubmission(pre, pk);
 
     // The approval must be the caller's own valid signature over approvalMessageHash(bodySha256, approvedAt).
     if (b.approval.moderator !== hexToNpub(pk))
@@ -104,6 +111,7 @@ export function moderationRoutes(app: FastifyInstance, ctx: Ctx): void {
 
     const row = await withTx(ctx.pool, async (c) => {
       const cur = await loadSubmission(c, id, true);
+      assertNotOwnSubmission(cur, pk);
       if (!canTransition("approve", cur.state)) throw new TransitionError("approve", cur.state);
       const contributor = await getContributor(ctx.pool, cur.contributor);
       if (!contributor || isRevoked(ctx.lists, contributor))
@@ -141,6 +149,7 @@ export function moderationRoutes(app: FastifyInstance, ctx: Ctx): void {
       const entry: FeedbackEntry = { at: new Date(ctx.now()).toISOString(), moderator: pk, kind, nip44: b.feedback };
       const row = await withTx(ctx.pool, async (c) => {
         const cur = await loadSubmission(c, id, true);
+        assertNotOwnSubmission(cur, pk);
         if (!canTransition(action, cur.state)) throw new TransitionError(action, cur.state);
         const updated = await transition(c, action, {
           id,
@@ -177,6 +186,7 @@ export function moderationRoutes(app: FastifyInstance, ctx: Ctx): void {
     return withTx(ctx.pool, async (c) => {
       const cur = await loadSubmission(c, id, true);
       if (!canTransition("rewrap", cur.state)) throw new TransitionError("rewrap", cur.state);
+      assertNotExpired(cur);
       // Only missing wraps are added: an existing recipient's wrap is never replaced.
       const added = Object.keys(wrappedKeys).filter((k) => !(k in cur.wrapped_keys));
       if (added.length) {

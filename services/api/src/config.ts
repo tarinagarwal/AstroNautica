@@ -22,9 +22,17 @@ export interface Config {
   unlistPerHour: number;
   submissionsPerHour: number;
   rejectedRetentionDays: number;
+  /** `draft` / `changes_requested` submissions not updated for this many days are expired by the retention job. */
+  draftRetentionDays: number;
   maxImageBytes: number;
   maxVideoBytes: number;
   maxBlocks: number;
+  /** Total declared media bytes of one submission. */
+  maxSubmissionBytes: number;
+  /** Total declared media bytes across a contributor's submissions whose staging data still exists. */
+  maxContributorStagingBytes: number;
+  /** Media items per submission. */
+  maxMediaPerSubmission: number;
   maxJsonBytes: number;
   bootstrapListEvents?: string;
   listsRefreshSeconds: number;
@@ -177,9 +185,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd: string = p
     unlistPerHour: parseIntVar("UNLIST_PER_HOUR", env.UNLIST_PER_HOUR, 5),
     submissionsPerHour: parseIntVar("SUBMISSIONS_PER_HOUR", env.SUBMISSIONS_PER_HOUR, 30),
     rejectedRetentionDays: parseIntVar("REJECTED_RETENTION_DAYS", env.REJECTED_RETENTION_DAYS, 30, 0),
+    draftRetentionDays: parseIntVar("DRAFT_RETENTION_DAYS", env.DRAFT_RETENTION_DAYS, 30, 1),
     maxImageBytes: parseSize("MAX_IMAGE_BYTES", env.MAX_IMAGE_BYTES, 20 * 1024 ** 2),
     maxVideoBytes: parseSize("MAX_VIDEO_BYTES", env.MAX_VIDEO_BYTES, 2 * 1024 ** 3),
     maxBlocks: parseIntVar("MAX_BLOCKS", env.MAX_BLOCKS, 100),
+    maxSubmissionBytes: parseSize("MAX_SUBMISSION_BYTES", env.MAX_SUBMISSION_BYTES, 4 * 1024 ** 3),
+    maxContributorStagingBytes: parseSize(
+      "MAX_CONTRIBUTOR_STAGING_BYTES",
+      env.MAX_CONTRIBUTOR_STAGING_BYTES,
+      8 * 1024 ** 3,
+    ),
+    maxMediaPerSubmission: parseIntVar("MAX_MEDIA_PER_SUBMISSION", env.MAX_MEDIA_PER_SUBMISSION, 200),
     maxJsonBytes: parseSize("MAX_JSON_BYTES", env.MAX_JSON_BYTES, 8 * 1024 ** 2),
     bootstrapListEvents: env.BOOTSTRAP_LIST_EVENTS || undefined,
     listsRefreshSeconds: parseIntVar("LISTS_REFRESH_SECONDS", env.LISTS_REFRESH_SECONDS, 30),

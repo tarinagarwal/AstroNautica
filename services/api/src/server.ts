@@ -5,7 +5,7 @@
 import cors from "@fastify/cors";
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyServerOptions } from "fastify";
 import type { AuditForwarder } from "./audit.js";
-import { ReplayCache, makeAuthenticate, makeRequire } from "./auth.js";
+import { PgReplayStore, makeAuthenticate, makeRequire } from "./auth.js";
 import type { Config } from "./config.js";
 import type { Ctx } from "./context.js";
 import type { Pool } from "./db.js";
@@ -141,7 +141,7 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
   });
   app.setNotFoundHandler((_req, reply) => reply.code(404).send({ error: "not_found", message: "no such endpoint" }));
 
-  const replay = new ReplayCache();
+  const replay = new PgReplayStore(deps.pool);
   const authDeps = { publicUrls: config.publicUrls, replay, lists: deps.lists, pool: deps.pool, now };
   const ctx: Ctx = {
     config,
@@ -153,7 +153,7 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
     nowSec: () => Math.floor(now() / 1000),
     authenticate: makeAuthenticate({ ...authDeps, basePath: config.basePath }),
     require: makeRequire(authDeps),
-    maxMedia: config.maxBlocks * 20,
+    maxMedia: Math.min(config.maxBlocks * 20, config.maxMediaPerSubmission),
   };
 
   await app.register(

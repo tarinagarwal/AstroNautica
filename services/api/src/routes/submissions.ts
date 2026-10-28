@@ -6,6 +6,8 @@ import { HttpError, conflict } from "../errors.js";
 import { consumeRate } from "../rateLimit.js";
 import { NOW, TransitionError, canTransition, recordEvent, transition, type MediaItem } from "../stateMachine.js";
 import {
+  assertNotExpired,
+  checkContributorQuota,
   checkWrappedKeys,
   loadSubmission,
   parseId,
@@ -43,6 +45,7 @@ export function submissionRoutes(app: FastifyInstance, ctx: Ctx): void {
         if (!(await consumeRate(c, pk, "submission", ctx.config.submissionsPerHour)))
           throw new HttpError(429, "rate_limited", "too many new submissions; try again later");
         await checkStoryOwner(c, b.storyId, pk);
+        await checkContributorQuota(c, ctx, pk, b.media);
         await c.query(
           `INSERT INTO submissions (id, story_id, version, supersedes, contributor, body_ciphertext, wrapped_keys, media)
            VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb)`,
@@ -83,7 +86,9 @@ export function submissionRoutes(app: FastifyInstance, ctx: Ctx): void {
           const cur = await loadSubmission(c, id, true);
           if (cur.contributor !== pk) throw new HttpError(404, "not_found", "submission not found");
           if (!canTransition("edit", cur.state)) throw new TransitionError("edit", cur.state);
+          assertNotExpired(cur);
           if (cur.story_id !== b.storyId) await checkStoryOwner(c, b.storyId, pk, id);
+          await checkContributorQuota(c, ctx, pk, b.media, id);
           const old = new Map(cur.media.map((m) => [m.sha256, m]));
           const media: MediaItem[] = b.media.map((m) => {
             const prev = old.get(m.sha256);
@@ -138,6 +143,7 @@ export function submissionRoutes(app: FastifyInstance, ctx: Ctx): void {
         const cur = await loadSubmission(c, id, true);
         if (cur.contributor !== pk) throw new HttpError(404, "not_found", "submission not found");
         if (!canTransition("submit", cur.state)) throw new TransitionError("submit", cur.state);
+        assertNotExpired(cur);
         const incomplete = cur.media.filter((m) => !m.complete).map((m) => m.sha256);
         if (incomplete.length)
           throw conflict("media_incomplete", `media not uploaded completely: ${incomplete.join(", ")}`);

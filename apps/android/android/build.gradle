@@ -1,0 +1,40 @@
+buildscript {
+    ext {
+        buildToolsVersion = "37.0.0"
+        minSdkVersion = 24
+        compileSdkVersion = 37
+        targetSdkVersion = 36
+        // The NDK in the build image (reactnativecommunity/react-native-android v22); RN's default is 27.1.
+        ndkVersion = "28.2.13676358"
+        kotlinVersion = "2.2.0"
+    }
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath("com.android.tools.build:gradle")
+        classpath("com.facebook.react:react-native-gradle-plugin")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+    }
+}
+
+allprojects {
+    repositories {
+        // Pin the security-relevant native libraries to Maven Central so no other repository can shadow them.
+        exclusiveContent {
+            forRepository { mavenCentral() }
+            filter {
+                includeGroup("info.guardianproject")
+                includeGroup("com.netzarchitekten")
+                includeGroup("com.goterl")
+                includeGroup("net.java.dev.jna")
+                includeGroup("com.squareup.okhttp3")
+            }
+        }
+        google()
+        mavenCentral()
+    }
+}
+
+apply plugin: "com.facebook.react.rootproject"

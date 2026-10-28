@@ -20,7 +20,7 @@ export interface Ctx {
   nowSec: () => number;
   authenticate: Hook;
   require: (...roles: Role[]) => Hook;
-  /** Max media items per submission (MAX_BLOCKS blocks of at most 20 images each). */
+  /** Max media items per submission: MAX_MEDIA_PER_SUBMISSION, and never more than MAX_BLOCKS blocks of 20 images. */
   maxMedia: number;
 }
 

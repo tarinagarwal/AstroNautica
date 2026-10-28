@@ -1,7 +1,7 @@
 import { createAuthHeader, generateKeyPair } from "@azaadawaaz/core";
 import { finalizeEvent } from "nostr-tools/pure";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { ReplayCache } from "../src/auth.js";
+import { AUTH_WINDOW_SEC, PgReplayStore } from "../src/auth.js";
 import { buildServer } from "../src/server.js";
 import {
   PUBLIC_URL,
@@ -127,14 +127,89 @@ describe("NIP-98 authentication", () => {
     );
   });
 
-  it("ReplayCache forgets ids after the window", () => {
-    const c = new ReplayCache(120_000);
-    expect(c.remember("a", 0)).toBe(true);
-    expect(c.remember("a", 119_999)).toBe(false);
-    expect(c.remember("a", 120_001)).toBe(true);
-    expect(c.remember("b", 200_000)).toBe(true);
-    c.remember("c", 400_000);
-    expect(c.size).toBe(1); // a and b were swept
+  it("a replay is refused by another API process sharing the database (restart or replica)", async () => {
+    const header = createAuthHeader(PUBLIC_URL + "/queue", "GET", env.mod1.kp.secretKey);
+    expect((await mod.get("/queue", { header })).status).toBe(200);
+    const replica = await buildServer({ config: env.config, pool: env.pool, lists: env.lists, logger: false });
+    try {
+      const r = await replica.inject({ method: "GET", url: "/queue", headers: { authorization: header } });
+      expect(r.statusCode).toBe(401);
+      expect(r.json().message).toBe("authorization replayed");
+    } finally {
+      await replica.close();
+    }
+  });
+
+  it("remembers an auth event until its created_at + window + 1 s, in Postgres", async () => {
+    const createdAt = Math.floor(Date.now() / 1000) - 50;
+    const header = createAuthHeader(PUBLIC_URL + "/queue", "GET", env.mod1.kp.secretKey, undefined, createdAt);
+    expect((await mod.get("/queue", { header })).status).toBe(200);
+    const id = JSON.parse(atob(header.slice(6))).id;
+    const row = await env.pool.query("SELECT extract(epoch FROM expires_at)::bigint AS exp FROM auth_replay WHERE event_id = $1", [
+      id,
+    ]);
+    expect(Number(row.rows[0].exp)).toBe(createdAt + AUTH_WINDOW_SEC + 1);
+
+    // A server whose clock says the event is still inside its window keeps refusing it until the very end of it.
+    const late = await buildServer({
+      config: env.config,
+      pool: env.pool,
+      lists: env.lists,
+      logger: false,
+      now: () => (createdAt + AUTH_WINDOW_SEC) * 1000,
+    });
+    try {
+      const r = await late.inject({ method: "GET", url: "/queue", headers: { authorization: header } });
+      expect(r.statusCode).toBe(401);
+      expect(r.json().message).toBe("authorization replayed");
+    } finally {
+      await late.close();
+    }
+
+    const store = new PgReplayStore(env.pool);
+    const t = 2_000_000_000;
+    const fresh = "e".repeat(64);
+    expect(await store.remember(fresh, t + 61, t * 1000)).toBe(true);
+    expect(await store.remember(fresh, t + 61, (t + 60) * 1000)).toBe(false);
+    expect(await store.remember(fresh, t + 61, (t + 60.999) * 1000)).toBe(false);
+    // expired but not purged yet: reusable
+    expect(await store.remember(fresh, t + 200, (t + 61) * 1000)).toBe(true);
+  });
+
+  it("answers 401 (never 500) for malformed auth events", async () => {
+    const good = JSON.parse(atob(createAuthHeader(PUBLIC_URL + "/queue", "GET", env.mod1.kp.secretKey).slice(6)));
+    const variants: unknown[] = [
+      null,
+      [],
+      "string",
+      42,
+      { ...good, tags: null },
+      { ...good, tags: "u" },
+      { ...good, tags: [null] },
+      { ...good, tags: [["u", 5]] },
+      { ...good, tags: [[]] },
+      { ...good, tags: [["u", PUBLIC_URL + "/queue"], "method"] },
+      { ...good, tags: { 0: ["u"] } },
+      { ...good, created_at: String(good.created_at) },
+      { ...good, created_at: 1.5 },
+      { ...good, kind: "27235" },
+      { ...good, content: null },
+      { ...good, id: 5 },
+      { ...good, pubkey: "x" },
+      { ...good, sig: undefined },
+    ];
+    for (const v of variants) {
+      const header = `Nostr ${Buffer.from(JSON.stringify(v)).toString("base64")}`;
+      const r = await mod.get("/queue", { header });
+      expect(r.status, JSON.stringify(v)).toBe(401);
+      expect(r.body.message).toBe("malformed authorization");
+    }
+    // Not even JSON / not base64
+    for (const header of ["Nostr ", "Nostr e30", "Nostr bnVsbA==", `Nostr ${btoa("{")}`]) {
+      const r = await mod.get("/queue", { header });
+      expect(r.status, header).toBe(401);
+    }
+    expect(env.logs.text).not.toContain('"statusCode":500');
   });
 });
 

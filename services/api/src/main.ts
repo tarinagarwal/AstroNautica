@@ -44,7 +44,12 @@ async function main() {
   const staging = new StagingStore(config.stagingDir);
   const cleanup = async () => {
     try {
-      const r = await runCleanup({ pool, staging, rejectedRetentionDays: config.rejectedRetentionDays });
+      const r = await runCleanup({
+        pool,
+        staging,
+        rejectedRetentionDays: config.rejectedRetentionDays,
+        draftRetentionDays: config.draftRetentionDays,
+      });
       app.log.info(r, "retention cleanup");
     } catch (e) {
       app.log.error({ err: e instanceof Error ? e.message : String(e) }, "retention cleanup failed");
