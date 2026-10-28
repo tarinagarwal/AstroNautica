@@ -5,7 +5,7 @@
  * `.dev/keys.json` and `.dev/list-events.json`.
  *
  * Prerequisite: the dev network is running (`docker compose -f infra/dev/docker-compose.yml up -d`).
- * Usage: node scripts/dev-setup.mjs [--reset]
+ * Usage: node scripts/dev-setup.mjs [--reset] [--redeploy]
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -26,6 +26,7 @@ import {
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const devDir = join(root, ".dev");
 const reset = process.argv.includes("--reset");
+const redeploy = reset || process.argv.includes("--redeploy");
 mkdirSync(devDir, { recursive: true });
 
 const RELAYS = ["ws://127.0.0.1:7777", "ws://127.0.0.1:7778"];
@@ -85,7 +86,7 @@ const artifact = JSON.parse(readFileSync(artifactPath, "utf8"));
 const ownerEvm = privateKeyToAccount(keys.owner.evmPrivateKey);
 const publisherEvm = privateKeyToAccount(keys.publisher.evmPrivateKey);
 const deploymentsPath = join(devDir, "deployments.json");
-const deployments = existsSync(deploymentsPath) && !reset ? JSON.parse(readFileSync(deploymentsPath, "utf8")) : {};
+const deployments = existsSync(deploymentsPath) && !redeploy ? JSON.parse(readFileSync(deploymentsPath, "utf8")) : {};
 const chains = [];
 for (const c of CHAINS) {
   const chain = defineChain({

@@ -9,7 +9,7 @@ import { Api, ApiError } from "./api.js";
 import { localSigner } from "./signer.js";
 import { pickVariant } from "../components/VerifiedImage.js";
 import { createAuditEvent } from "../data/moderation.js";
-import { createWorld, publishStory, rpcReply, textStory } from "../test/world.js";
+import { PUBLISHER_EVM, createWorld, publishStory, rpcReply, textStory } from "../test/world.js";
 import { TEST_URLS } from "../test/fakes.js";
 
 describe("safe Markdown", () => {
@@ -42,10 +42,16 @@ describe("safe Markdown", () => {
 describe("registry JSON-RPC", () => {
   it("uses the ABI's receipt selector and Published topic", () => {
     const sel = (s: string) => "0x" + bytesToHex(keccak_256(new TextEncoder().encode(s)));
-    expect(RECEIPT_SELECTOR).toBe(sel("receipt(bytes16,uint32)").slice(0, 10));
-    expect(PUBLISHED_TOPIC).toBe(sel("Published(bytes16,uint32,bytes32,string,uint64)"));
-    expect(encodeReceiptCall("01928f3e-7c1a-7b2c-8d3e-4f5a6b7c8d9e", 3)).toBe(
-      RECEIPT_SELECTOR + "01928f3e7c1a7b2c8d3e4f5a6b7c8d9e" + "0".repeat(32) + "0".repeat(63) + "3",
+    expect(RECEIPT_SELECTOR).toBe(sel("receipt(bytes16,uint32,address)").slice(0, 10));
+    expect(PUBLISHED_TOPIC).toBe(sel("Published(bytes16,uint32,address,bytes32,string,uint64)"));
+    expect(encodeReceiptCall("01928f3e-7c1a-7b2c-8d3e-4f5a6b7c8d9e", 3, "0x" + "AB".repeat(20))).toBe(
+      RECEIPT_SELECTOR +
+        "01928f3e7c1a7b2c8d3e4f5a6b7c8d9e" +
+        "0".repeat(32) +
+        "0".repeat(63) +
+        "3" +
+        "0".repeat(24) +
+        "ab".repeat(20),
     );
   });
 
@@ -57,34 +63,53 @@ describe("registry JSON-RPC", () => {
       return new Response(r.body as string, { status: r.status });
     }) as unknown as typeof fetch;
     const chain = { key: "x", chainId: 31337, rpc: TEST_URLS.rpc, registry: world.registry };
-    const ok = await checkChainReceipt(chain, b.manifest.id, 1, b.sha256, rpc);
+    const pubs = [{ address: PUBLISHER_EVM, from: 0 }];
+    const ok = await checkChainReceipt(chain, b.manifest.id, 1, b.sha256, pubs, rpc);
     expect(ok).toMatchObject({ ok: true, manifestSha256: b.sha256, manifestCid: b.cid });
-    const bad = await checkChainReceipt(chain, b.manifest.id, 1, "ab".repeat(32), rpc);
+    const bad = await checkChainReceipt(chain, b.manifest.id, 1, "ab".repeat(32), pubs, rpc);
     expect(bad).toMatchObject({ ok: false, error: "mismatch" });
-    const missing = await checkChainReceipt(chain, b.manifest.id, 2, b.sha256, rpc);
+    const missing = await checkChainReceipt(chain, b.manifest.id, 2, b.sha256, pubs, rpc);
     expect(missing).toMatchObject({ ok: false, error: "not-found" });
+    // A receipt by an address that wasn't the publisher at that time doesn't count.
+    const stranger = await checkChainReceipt(
+      chain,
+      b.manifest.id,
+      1,
+      b.sha256,
+      [{ address: "0x" + "ee".repeat(20), from: 0 }],
+      rpc,
+    );
+    expect(stranger).toMatchObject({ ok: false, error: "not-found" });
+    const expired = await checkChainReceipt(
+      chain,
+      b.manifest.id,
+      1,
+      b.sha256,
+      [{ address: PUBLISHER_EVM, from: 0, until: 1 }],
+      rpc,
+    );
+    expect(expired.ok).toBe(false);
     const down = await checkChainReceipt(
       chain,
       b.manifest.id,
       1,
       b.sha256,
+      pubs,
       (async () => new Response("", { status: 502 })) as never,
     );
     expect(down).toMatchObject({ ok: false, error: "unreachable" });
     const d =
       "0x" +
-      "0".repeat(63) +
-      "2" +
       "cd".repeat(32) +
       "0".repeat(62) +
-      "80" +
+      "60" +
       "0".repeat(56) +
       "65432100" +
       "0".repeat(63) +
       "4" +
       "62616679" +
       "0".repeat(56);
-    expect(decodePublishedData(d)).toEqual({ version: 2, sha: "cd".repeat(32), cid: "bafy", timestamp: 0x65432100 });
+    expect(decodePublishedData(d)).toEqual({ sha: "cd".repeat(32), cid: "bafy", timestamp: 0x65432100 });
   });
 });
 

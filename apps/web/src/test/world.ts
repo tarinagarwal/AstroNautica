@@ -16,7 +16,10 @@ import {
 } from "@azaadawaaz/core";
 import { canonicalize, manifestSha256, sha256Hex, uuidv7, type Manifest } from "@azaadawaaz/schema";
 import { encodeDirectory, encodeFile, type Block } from "./unixfs-encode.js";
-import { PUBLISHED_TOPIC, RECEIPT_SELECTOR, storyTopic } from "../lib/eth.js";
+import { PUBLISHED_TOPIC, RECEIPT_SELECTOR, addressTopic, storyTopic, versionTopic } from "../lib/eth.js";
+
+/** The publisher's EVM address in the test world (receipts are stored per writer). */
+export const PUBLISHER_EVM = "0x" + "a1".repeat(20);
 
 export interface WorldUrls {
   relay: string;
@@ -51,7 +54,7 @@ export interface World {
   files: Map<string, Uint8Array>;
   /** Arweave transactions. */
   arweave: Map<string, Uint8Array>;
-  /** Chain receipts: storyId:version → { sha, cid, timestamp, tx, block }. */
+  /** Chain receipts: storyId:version:writer → { sha, cid, timestamp, tx, block }. */
   receipts: Map<string, { sha: string; cid: string; timestamp: number; tx: string; block: number }>;
   registry: string;
   chainId: number;
@@ -152,7 +155,13 @@ export async function createWorld(urls: WorldUrls): Promise<World> {
       "service-keys",
       [
         { role: "owner", pubkey: world.owner.pubkey, x25519: world.ownerX.publicKey, from: 0 },
-        { role: "publisher", pubkey: world.publisher.pubkey, x25519: world.publisherX.publicKey, from: 0 },
+        {
+          role: "publisher",
+          pubkey: world.publisher.pubkey,
+          x25519: world.publisherX.publicKey,
+          evm: PUBLISHER_EVM,
+          from: 0,
+        },
       ],
       world.owner.secretKey,
       t0,
@@ -192,7 +201,7 @@ export function publishStory(world: World, m: Manifest, createdAt = Math.floor(D
     world.publisher.secretKey,
     createdAt + 30,
   );
-  world.receipts.set(`${m.id}:${m.version}`, {
+  world.receipts.set(`${m.id}:${m.version}:${PUBLISHER_EVM}`, {
     sha,
     cid,
     timestamp: createdAt + 60,
@@ -372,14 +381,13 @@ export function arweaveReply(world: World, path: string): HttpReply {
 
 const pad = (h: string) => h.padStart(64, "0");
 
-function encodePublished(version: number, sha: string, cid: string, timestamp: number): string {
+function encodePublished(sha: string, cid: string, timestamp: number): string {
   const cidHex = Array.from(enc.encode(cid), (b) => b.toString(16).padStart(2, "0")).join("");
   const padded = cidHex.padEnd(Math.ceil(cidHex.length / 64) * 64, "0");
   return (
     "0x" +
-    pad(version.toString(16)) +
     sha +
-    pad((4 * 32).toString(16)) +
+    pad((3 * 32).toString(16)) +
     pad(timestamp.toString(16)) +
     pad((cidHex.length / 2).toString(16)) +
     padded
@@ -393,27 +401,43 @@ export function rpcReply(world: World, body: string): HttpReply {
     body: JSON.stringify({ jsonrpc: "2.0", id: req.id, result }),
     type: "application/json",
   });
-  const find = (topic: string) => [...world.receipts.entries()].filter(([k]) => storyTopic(k.split(":")[0]!) === topic);
+  const parts = (k: string) => {
+    const [id, version, writer] = k.split(":");
+    return { id: id!, version: Number(version), writer: writer! };
+  };
   switch (req.method) {
     case "eth_call": {
       const data: string = req.params[0].data;
       if (!data.startsWith(RECEIPT_SELECTOR) || req.params[0].to.toLowerCase() !== world.registry) return ok("0x");
       const idTopic = "0x" + data.slice(10, 74);
       const version = parseInt(data.slice(74, 138), 16);
-      const hit = find(idTopic).find(([k]) => Number(k.split(":")[1]) === version)?.[1];
+      const writer = "0x" + data.slice(138 + 24, 202);
+      const hit = [...world.receipts.entries()].find(([k]) => {
+        const p = parts(k);
+        return storyTopic(p.id) === idTopic && p.version === version && p.writer.toLowerCase() === writer.toLowerCase();
+      })?.[1];
       return ok(hit ? "0x" + hit.sha + pad(hit.timestamp.toString(16)) : "0x" + "0".repeat(128));
     }
     case "eth_getLogs": {
       const f = req.params[0];
       if (f.topics?.[0] !== PUBLISHED_TOPIC) return ok([]);
+      const t: (string | null | undefined)[] = f.topics;
       return ok(
-        find(f.topics[1]).map(([k, r]) => ({
-          address: world.registry,
-          topics: [PUBLISHED_TOPIC, f.topics[1]],
-          data: encodePublished(Number(k.split(":")[1]), r.sha, r.cid, r.timestamp),
-          transactionHash: r.tx,
-          blockNumber: "0x" + r.block.toString(16),
-        })),
+        [...world.receipts.entries()]
+          .map(([k, r]) => ({ p: parts(k), r }))
+          .filter(
+            ({ p }) =>
+              (!t[1] || t[1] === storyTopic(p.id)) &&
+              (!t[2] || t[2] === versionTopic(p.version)) &&
+              (!t[3] || t[3] === addressTopic(p.writer)),
+          )
+          .map(({ p, r }) => ({
+            address: world.registry,
+            topics: [PUBLISHED_TOPIC, storyTopic(p.id), versionTopic(p.version), addressTopic(p.writer)],
+            data: encodePublished(r.sha, r.cid, r.timestamp),
+            transactionHash: r.tx,
+            blockNumber: "0x" + r.block.toString(16),
+          })),
       );
     }
     case "eth_getBlockByNumber": {

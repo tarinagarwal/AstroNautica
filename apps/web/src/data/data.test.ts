@@ -7,7 +7,15 @@ import { normalize } from "../config.js";
 import { setFetch, flaggedSources } from "../lib/gateways.js";
 import { idbReset } from "../lib/idb.js";
 import { FakePool, TEST_URLS, worldFetch } from "../test/fakes.js";
-import { createWorld, everyBlockStory, publishStory, textStory, worldConfig, type World } from "../test/world.js";
+import {
+  PUBLISHER_EVM,
+  createWorld,
+  everyBlockStory,
+  publishStory,
+  textStory,
+  worldConfig,
+  type World,
+} from "../test/world.js";
 import { encodeFile } from "../test/unixfs-encode.js";
 
 let world: World;
@@ -168,7 +176,7 @@ describe("data layer", () => {
   it("Verify is red when a chain has no receipt", async () => {
     const { app } = await setup();
     const ref = app.stories[0]!;
-    world.receipts.delete(`${ref.storyId}:${ref.version}`);
+    world.receipts.delete(`${ref.storyId}:${ref.version}:${PUBLISHER_EVM}`);
     const r = await verifyStory(app, ref, () => {}, rpc(world));
     expect(r.chains.state).toBe("fail");
     expect(r.chains.receipts[0]!.error).toBe("not-found");

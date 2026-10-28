@@ -62,7 +62,9 @@ export async function verifyStory(
 
   // 1. The announcing event: signed by a publisher key valid at the time.
   const eventOk =
-    verifyEventStrict(ref.event) && !!app.lists && wasPublisherAt(app.lists, ref.publisher, ref.createdAt, ref.manifestSha256);
+    verifyEventStrict(ref.event) &&
+    !!app.lists &&
+    wasPublisherAt(app.lists, ref.publisher, ref.createdAt, ref.manifestSha256);
   update({ event: { state: eventOk ? "ok" : "fail" } });
 
   const tasks: Promise<void>[] = [];
@@ -140,7 +142,14 @@ export async function verifyStory(
       if (!chains.length) return update({ chains: { state: "fail", receipts: [], error: "no-chains" } });
       const receipts = await Promise.all(
         chains.map((c) =>
-          checkChainReceipt(c, ref.storyId, ref.version, ref.manifestSha256, publisherWindows(app.lists?.serviceKeys ?? []), rpcFetch),
+          checkChainReceipt(
+            c,
+            ref.storyId,
+            ref.version,
+            ref.manifestSha256,
+            publisherWindows(app.lists?.serviceKeys ?? []),
+            rpcFetch,
+          ),
         ),
       );
       update({ chains: { state: receipts.every((x) => x.ok) ? "ok" : "fail", receipts } });

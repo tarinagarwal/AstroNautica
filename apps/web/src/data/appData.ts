@@ -119,7 +119,8 @@ export class AppData {
   async init(): Promise<void> {
     this.addListEvents(this.config.listEvents);
     const seen = await idbGet<[string, number][]>("lists:firstSeen");
-    if (seen) for (const [k, v] of seen) if (!this.firstSeen.has(k) || this.firstSeen.get(k)! > v) this.firstSeen.set(k, v);
+    if (seen)
+      for (const [k, v] of seen) if (!this.firstSeen.has(k) || this.firstSeen.get(k)! > v) this.firstSeen.set(k, v);
     this.firstSeenLoaded = true;
     const cached = await idbGet<Event[]>("lists:events");
     if (cached) this.addListEvents(cached);

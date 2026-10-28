@@ -189,7 +189,12 @@ export async function checkChainReceipt(
       continue;
     }
     if (!r || !validAt(p, r.timestamp)) continue;
-    const out: ChainReceipt = { chain: c, ok: r.sha === expectedSha256.toLowerCase(), manifestSha256: r.sha, timestamp: r.timestamp };
+    const out: ChainReceipt = {
+      chain: c,
+      ok: r.sha === expectedSha256.toLowerCase(),
+      manifestSha256: r.sha,
+      timestamp: r.timestamp,
+    };
     if (!out.ok) out.error = "mismatch";
     if (out.ok || !best) best = out;
     if (out.ok) {
@@ -234,7 +239,9 @@ export async function findPublishedCid(
 }
 
 /** Publisher EVM keys and their validity windows from the effective lists. */
-export function publisherWindows(serviceKeys: { role: string; evm?: string; from: number; until?: number }[]): PublisherWindow[] {
+export function publisherWindows(
+  serviceKeys: { role: string; evm?: string; from: number; until?: number }[],
+): PublisherWindow[] {
   return serviceKeys
     .filter((k) => k.role === "publisher" && k.evm)
     .map((k) => ({ address: k.evm!, from: k.from, ...(k.until !== undefined ? { until: k.until } : {}) }));
