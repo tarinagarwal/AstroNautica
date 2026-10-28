@@ -31,22 +31,22 @@ describe("logging never contains IP addresses", () => {
       await env.app.inject({ method: "GET", url: "/nope", remoteAddress });
     }
     // a 500: break the database connection pool for one request
-    const original = env.pool.query.bind(env.pool);
-    (env.pool as { query: unknown }).query = () => Promise.reject(new Error("boom"));
+    const original = env.apiPool.query.bind(env.apiPool);
+    (env.apiPool as { query: unknown }).query = () => Promise.reject(new Error("boom"));
     const r = await env.app.inject({
       method: "GET",
       url: "/contributors",
       remoteAddress: "203.0.113.8",
       headers: { authorization: env.client(env.mod1).lastAuth },
     });
-    (env.pool as { query: unknown }).query = original;
+    (env.apiPool as { query: unknown }).query = original;
     expect([401, 500]).toContain(r.statusCode);
     const fail = await env.client(env.mod1).get("/queue");
     expect(fail.status).toBe(200);
-    (env.pool as { query: unknown }).query = () =>
+    (env.apiPool as { query: unknown }).query = () =>
       Promise.reject(new Error("connect ECONNREFUSED 10.9.8.7:5432 via ::ffff:10.9.8.7 and fe80::1:2:3"));
     const err = await env.client(env.mod1).get("/contributors");
-    (env.pool as { query: unknown }).query = original;
+    (env.apiPool as { query: unknown }).query = original;
     expect(err.status).toBe(500);
     expect(err.body).toEqual({ error: "internal", message: "internal server error" });
 

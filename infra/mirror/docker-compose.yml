@@ -14,10 +14,10 @@ x-base: &base
   security_opt: ["no-new-privileges:true"]
 
 volumes:
-  web-root:       # exported web app builds: /srv/web/<cid>, /srv/web/current -> <cid>
+  web-root: # exported web app builds: /srv/web/<cid>, /srv/web/current -> <cid>
   ipfs-data:
   relay-db:
-  sync-state:     # last verified lists, cursors
+  sync-state: # last verified lists, cursors
   onion-keys:
   onion-sockets:
 

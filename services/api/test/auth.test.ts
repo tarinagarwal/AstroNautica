@@ -145,9 +145,10 @@ describe("NIP-98 authentication", () => {
     const header = createAuthHeader(PUBLIC_URL + "/queue", "GET", env.mod1.kp.secretKey, undefined, createdAt);
     expect((await mod.get("/queue", { header })).status).toBe(200);
     const id = JSON.parse(atob(header.slice(6))).id;
-    const row = await env.pool.query("SELECT extract(epoch FROM expires_at)::bigint AS exp FROM auth_replay WHERE event_id = $1", [
-      id,
-    ]);
+    const row = await env.pool.query(
+      "SELECT extract(epoch FROM expires_at)::bigint AS exp FROM auth_replay WHERE event_id = $1",
+      [id],
+    );
     expect(Number(row.rows[0].exp)).toBe(createdAt + AUTH_WINDOW_SEC + 1);
 
     // A server whose clock says the event is still inside its window keeps refusing it until the very end of it.

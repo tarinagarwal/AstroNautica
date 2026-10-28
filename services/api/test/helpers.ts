@@ -86,6 +86,31 @@ export async function createDatabase(): Promise<{ url: string; drop: () => Promi
   };
 }
 
+/** A throwaway LOGIN user that is a member of `groupRole` only; returns its connection URL for `dbUrl`'s database. */
+export async function createRoleUser(
+  dbUrl: string,
+  groupRole: string,
+): Promise<{ url: string; drop: () => Promise<void> }> {
+  const name = `t_${groupRole.replace(/^azaad_|_role$/g, "")}_${randomBytes(6).toString("hex")}`;
+  const password = randomBytes(12).toString("hex");
+  const admin = new pg.Client({ connectionString: TEST_DB_URL });
+  await admin.connect();
+  await admin.query(`CREATE ROLE ${name} LOGIN PASSWORD '${password}' IN ROLE ${groupRole}`);
+  await admin.end();
+  const u = new URL(dbUrl);
+  u.username = name;
+  u.password = password;
+  return {
+    url: u.toString(),
+    drop: async () => {
+      const c = new pg.Client({ connectionString: TEST_DB_URL });
+      await c.connect();
+      await c.query(`DROP ROLE IF EXISTS ${name}`);
+      await c.end();
+    },
+  };
+}
+
 export function testConfig(
   over: Partial<Config> & { stagingDir: string; databaseUrl: string; ownerPubkey: string },
 ): Config {
@@ -118,7 +143,10 @@ export function testConfig(
 
 export interface TestEnv {
   app: FastifyInstance;
+  /** Owner (superuser) connection for test setup and inspection. */
   pool: Pool;
+  /** What the server uses: a LOGIN member of `azaad_api_role` only, as in production (migration 004). */
+  apiPool: Pool;
   lists: ListsService;
   config: Config;
   logs: LogCapture;
@@ -137,6 +165,8 @@ export async function setup(over: Partial<Config> = {}): Promise<TestEnv> {
   const db = await createDatabase();
   const pool = createPool(db.url, 10);
   await runMigrations(pool);
+  const apiUser = await createRoleUser(db.url, "azaad_api_role");
+  const apiPool = createPool(apiUser.url, 10);
   const stagingDir = await mkdtemp(join(tmpdir(), "api-staging-"));
   const [owner, publisher, mod1, mod2] = await Promise.all([newActor(), newActor(), newActor(), newActor()]);
   const config = testConfig({ stagingDir, databaseUrl: db.url, ownerPubkey: owner.kp.pubkey, ...over });
@@ -174,10 +204,17 @@ export async function setup(over: Partial<Config> = {}): Promise<TestEnv> {
   setModerators([{ actor: mod1 }, { actor: mod2 }]);
   const logs = new LogCapture();
   const forwarded = new RecordingForwarder();
-  const app = await buildServer({ config, pool, lists, forwarder: forwarded, logger: { stream: logs, level: "info" } });
+  const app = await buildServer({
+    config,
+    pool: apiPool,
+    lists,
+    forwarder: forwarded,
+    logger: { stream: logs, level: "info" },
+  });
   const env: TestEnv = {
     app,
     pool,
+    apiPool,
     lists,
     config,
     logs,
@@ -190,8 +227,10 @@ export async function setup(over: Partial<Config> = {}): Promise<TestEnv> {
     setModerators,
     close: async () => {
       await app.close();
+      await apiPool.end();
       await pool.end();
       await db.drop();
+      await apiUser.drop();
       await rm(stagingDir, { recursive: true, force: true });
     },
   };

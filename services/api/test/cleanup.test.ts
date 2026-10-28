@@ -58,7 +58,7 @@ describe("retention cleanup", () => {
 
     const staging = new StagingStore(env.config.stagingDir);
     const r = await runCleanup({ pool: env.pool, staging, rejectedRetentionDays: 30 });
-    expect(r).toEqual({ rejectedPurged: 1, publishedPurged: 1, rateEventsPruned: 1 });
+    expect(r).toMatchObject({ rejectedPurged: 1, publishedPurged: 1, draftsExpired: 0, rateEventsPruned: 1 });
 
     expect(existsSync(dir(oldRejected.id))).toBe(false);
     expect(existsSync(dir(published.id))).toBe(false);
@@ -76,9 +76,10 @@ describe("retention cleanup", () => {
     expect((await row(approvedOnly.id)).publisher_wrapped_key).not.toBeNull();
 
     // idempotent
-    expect(await runCleanup({ pool: env.pool, staging, rejectedRetentionDays: 30 })).toEqual({
+    expect(await runCleanup({ pool: env.pool, staging, rejectedRetentionDays: 30 })).toMatchObject({
       rejectedPurged: 0,
       publishedPurged: 0,
+      draftsExpired: 0,
       rateEventsPruned: 0,
     });
     // the owner/moderators can still see the record, without data

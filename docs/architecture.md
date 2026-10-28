@@ -290,3 +290,28 @@ Additive or clarifying; no field or endpoint of the contract was removed or rena
     `invalid_state` (409), `rate_limited` (429), `lists_unavailable` (503, until the owner's moderator and
     service-key lists are loaded). Submissions a caller may not read are 404, not 403.
 12. **`SUBMISSIONS_PER_HOUR`** (default 30) rate-limits new submissions per contributor key via `rate_events`.
+
+### Deviations → security review fixes (all services)
+- **Auth replay:** NIP-98 replay entries are kept in Postgres (`auth_replay`, migration 003) until `created_at + 61 s`,
+  so replays fail across restarts and replicas; malformed auth events are 401, never 500.
+- **Quotas:** `MAX_SUBMISSION_BYTES` (4 GiB) → 413 `submission_too_large`; `MAX_CONTRIBUTOR_STAGING_BYTES` (8 GiB)
+  across non-final submissions → 413 `staging_quota_exceeded`; `MAX_MEDIA_PER_SUBMISSION` (200). Drafts and
+  change-requested submissions untouched for `DRAFT_RETENTION_DAYS` (30) expire: staging deleted, ciphertext cleared,
+  later edits/uploads answer 410 `submission_expired`. `GET /config` `limits` includes `maxSubmissionBytes`,
+  `maxContributorStagingBytes`, `draftRetentionDays`.
+- **No self-review:** approve/reject/request-changes on a submission whose contributor is the caller → 403.
+- **Database roles** (migration 004): `azaad_api_role` and `azaad_publisher_role` (least privilege; the publisher may
+  only update `submissions(state, manifest_sha256, manifest_cid, published_at, updated_at)` and `publish_jobs`, and
+  insert `owner_alerts`). Production uses LOGIN users `api` and `publisher`; migrations run as the owner in a one-shot
+  `migrate` service.
+- **Publish jobs** can be `blocked` (policy failure: revoked contributor, removed moderator, tampered content); the
+  publisher stops retrying, wipes its work files and alerts the owner. `POST /jobs/:id/retry` re-queues it.
+- **Pipeline:** step order is decrypt → checks → media → ipfs → pin → torrent → manifest → nostr (published) →
+  chain:<key>… → arweave → storage-receipt → finalize (decision D12). Media processing runs in the isolated `media`
+  worker (`POST /process` on an internal network, shared volume; decision D21).
+- **Registry:** `receipt(storyId, version, by)` and `Published(storyId, version, publisher, …)` with all three indexed
+  (decision D19).
+- **Relays** accept only: 30023 from owner/publishers, 30078 from owner/moderators/publishers, 9737 from
+  owner/moderators, 1111/7 with PoW; never kinds 5, 62, 27235 or anything else (decision D20). They learn moderators and
+  publishers from the owner's lists (`OWNER_PUBKEY`).
+- **Lists:** new owner list `vouched` (decision D17); moderator-list caps per D18.

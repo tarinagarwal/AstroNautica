@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.azaadawaaz.app.core.NetCoreTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-10-28T01:52:21.380Z" hostname="vm" time="8.232">
+  <properties/>
+  <testcase name="torModeUsesSocksAndNeverLocalDns" classname="org.azaadawaaz.app.core.NetCoreTest" time="0.116"/>
+  <testcase name="cancelAbortsARequest" classname="org.azaadawaaz.app.core.NetCoreTest" time="5.031"/>
+  <testcase name="chainedDnsTriesResolversInOrder" classname="org.azaadawaaz.app.core.NetCoreTest" time="0.002"/>
+  <testcase name="uploadSendsTheFile" classname="org.azaadawaaz.app.core.NetCoreTest" time="0.008"/>
+  <testcase name="onionNamesNeverReachAResolver" classname="org.azaadawaaz.app.core.NetCoreTest" time="0.001"/>
+  <testcase name="requestReturnsStatusHeadersAndBody" classname="org.azaadawaaz.app.core.NetCoreTest" time="0.004"/>
+  <testcase name="blockedModeRefusesRequests" classname="org.azaadawaaz.app.core.NetCoreTest" time="0.001"/>
+  <testcase name="downloadVerifiesSha256AndLeavesNothingOnMismatch" classname="org.azaadawaaz.app.core.NetCoreTest" time="0.037"/>
+  <testcase name="requestTimesOut" classname="org.azaadawaaz.app.core.NetCoreTest" time="3.003"/>
+  <testcase name="resolvesThroughDnsOverHttps" classname="org.azaadawaaz.app.core.NetCoreTest" time="0.023"/>
+  <testcase name="requestEnforcesMaxBytes" classname="org.azaadawaaz.app.core.NetCoreTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[Oct 28, 2026 1:52:29 AM okhttp3.internal.platform.Platform log
+WARNING: Incorrect protocol: http/1.1
+Oct 28, 2026 1:52:29 AM okhttp3.internal.platform.Platform log
+WARNING: Incorrect protocol: http/1.1
+]]></system-err>
+</testsuite>

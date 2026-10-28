@@ -49,12 +49,16 @@ read-only root file system (it only writes to `STAGING_DIR`).
 | `UNLIST_PER_HOUR` | `5` | Unlistings per moderator per hour (the owner is not limited) |
 | `SUBMISSIONS_PER_HOUR` | `30` | New submissions per contributor key per hour |
 | `REJECTED_RETENTION_DAYS` | `30` | Staging retention for rejected submissions |
+| `DRAFT_RETENTION_DAYS` | `30` | `draft` / `changes_requested` submissions not updated for this long expire: staging and ciphertext are deleted, further writes answer `410 submission_expired` |
 | `CLEANUP_INTERVAL_MINUTES` | `60` | Retention job interval |
 | `MAX_IMAGE_BYTES` | `20MB` | Per image (plaintext) |
 | `MAX_VIDEO_BYTES` | `2GB` | Per video (plaintext) |
-| `MAX_BLOCKS` | `100` | Blocks per story; media items per submission are capped at 20 × this |
+| `MAX_BLOCKS` | `100` | Blocks per story; media items per submission are also capped at 20 × this |
+| `MAX_MEDIA_PER_SUBMISSION` | `200` | Media items per submission |
+| `MAX_SUBMISSION_BYTES` | `4GB` | Total declared media bytes of one submission (`413 submission_too_large`) |
+| `MAX_CONTRIBUTOR_STAGING_BYTES` | `8GB` | Total declared media bytes of one contributor's submissions still in progress (not rejected/published/unlisted, staging not deleted) (`413 staging_quota_exceeded`) |
 | `MAX_JSON_BYTES` | `8MB` | JSON body limit (chunk uploads are limited to 1 MiB + 17 bytes) |
-| `AUTO_MIGRATE` | `true` | Apply migrations on start |
+| `AUTO_MIGRATE` | `true` | Apply migrations on start. Production sets `false`: a one-shot `migrate` service runs them as the database owner, and the API connects as a member of `azaad_api_role` |
 | `LOG_LEVEL` | `info` | pino level |
 | `TRUST_PROXY` | – | Only `false` is accepted: the API never reads client addresses |
 
@@ -63,12 +67,19 @@ Sizes accept plain bytes or binary suffixes (`20MB` = 20 MiB). See `.env.example
 ## Behaviour worth knowing
 
 - **Auth:** `Authorization: Nostr <base64 kind-27235 event>`, `u` = public URL + path + query, `method`, and `payload`
-  = SHA-256 of the raw body for every request with a body. Events must be within 60 s of server time; an event id is
-  accepted once per 120 s, so two byte-identical requests signed in the same second are a replay (add a nonce tag or
-  wait a second).
+  = SHA-256 of the raw body for every request with a body. Events must be within 60 s of server time. An accepted
+  event id is stored in Postgres (`auth_replay`) until its `created_at` + 61 s, so a replay fails across restarts and
+  replicas; two byte-identical requests signed in the same second are a replay (add a nonce tag). Any malformed auth
+  event (bad JSON, non-array `tags`, non-string tag values, a non-integer `created_at`, …) is `401`, never `500`.
 - **Roles:** owner = pinned key; moderator = active on the owner-signed moderator list, or the owner; contributor =
   redeemed an invite and not revoked (in the database or on any moderator's signed `revoked-contributors` list).
-  Revoked contributors can still read their own submissions.
+  Revoked contributors can still read their own submissions. Revocation that the publisher honours is the database's
+  `revoked_at` (set by `POST /contributors/:pubkey/revoke`).
+- **No self-review:** a moderator (or the owner) cannot approve, reject or request changes on a submission whose
+  contributor key is their own (`403`).
+- **Quotas and expiry:** see `MAX_SUBMISSION_BYTES`, `MAX_CONTRIBUTOR_STAGING_BYTES`, `MAX_MEDIA_PER_SUBMISSION` and
+  `DRAFT_RETENTION_DAYS`; uploads must match the declared sizes exactly, so the declared sizes bound the disk use.
+  `GET /config` returns them under `limits`.
 - **State machine:** `src/stateMachine.ts` holds every transition; each one is a single guarded
   `UPDATE … WHERE state = ANY(…)`, so concurrent approvals produce exactly one `approved` (the other gets `409`).
   Decisions (approve, reject, request changes) need `in_review`, i.e. a claim first; claims are advisory and expire.
@@ -83,6 +94,20 @@ Sizes accept plain bytes or binary suffixes (`20MB` = 20 MiB). See `.env.example
   revoke/mute, `["e", id]` for hide. Stored in `audit_events` and forwarded to our own relays.
 - **Privacy:** `trustProxy: false`; logs contain only method, route pattern, status and timings — no addresses,
   headers, ids or pino `hostname`/`pid`.
+
+## Database roles
+
+Migration `004_db_roles.sql` creates two `NOLOGIN` group roles with least-privilege grants:
+
+- `azaad_api_role`: what the API uses (no `DELETE` except on `rate_events`/`auth_replay`, the audit and invite tables
+  are append-only, no access to `schema_migrations`);
+- `azaad_publisher_role`: `SELECT` on `submissions` and `contributors`; `UPDATE` on `submissions(state,
+  manifest_sha256, manifest_cid, published_at, updated_at)` only; `SELECT`/`UPDATE` on `publish_jobs`; `INSERT` on
+  `owner_alerts` (+ its sequence).
+
+Deployments create `LOGIN` users that are members of these roles (`infra/prod/postgres/init-users.sh`) and run the
+migrations as the database owner. A migration that adds a table must grant on it explicitly. The tests run the server
+as a throwaway member of `azaad_api_role`, so a missing grant fails them.
 
 ## Test
 

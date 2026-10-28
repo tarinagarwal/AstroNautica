@@ -151,16 +151,38 @@ services:
   # Receipt chain 1 (stands in for Base, decisions.md D7).
   anvil:
     <<: *anvil
-    command: ["--host", "0.0.0.0", "--port", "8545", "--chain-id", "31337",
-              "--state", "/home/foundry/state/anvil.json", "--state-interval", "30"]
+    command:
+      [
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8545",
+        "--chain-id",
+        "31337",
+        "--state",
+        "/home/foundry/state/anvil.json",
+        "--state-interval",
+        "30",
+      ]
     ports: ["127.0.0.1:${ANVIL_PORT:-8545}:8545"]
     volumes: ["anvil-state:/home/foundry/state"]
 
   # Receipt chain 2 (stands in for BNB Smart Chain testnet id 97, D7).
   anvil-bsc:
     <<: *anvil
-    command: ["--host", "0.0.0.0", "--port", "8545", "--chain-id", "97",
-              "--state", "/home/foundry/state/anvil.json", "--state-interval", "30"]
+    command:
+      [
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8545",
+        "--chain-id",
+        "97",
+        "--state",
+        "/home/foundry/state/anvil.json",
+        "--state-interval",
+        "30",
+      ]
     ports: ["127.0.0.1:${ANVIL_BSC_PORT:-8546}:8545"]
     volumes: ["anvil-bsc-state:/home/foundry/state"]
 

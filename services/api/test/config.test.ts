@@ -34,7 +34,31 @@ describe("config", () => {
       maxBlocks: 100,
       allowedOrigins: ["http://localhost:5173", "http://127.0.0.1:5173"],
       autoMigrate: true,
+      maxSubmissionBytes: 4 * 1024 ** 3,
+      maxContributorStagingBytes: 8 * 1024 ** 3,
+      maxMediaPerSubmission: 200,
+      draftRetentionDays: 30,
     });
+  });
+
+  it("reads the staging quotas and draft retention", () => {
+    const c = loadConfig(
+      {
+        ...base,
+        MAX_SUBMISSION_BYTES: "1GB",
+        MAX_CONTRIBUTOR_STAGING_BYTES: "3GB",
+        MAX_MEDIA_PER_SUBMISSION: "50",
+        DRAFT_RETENTION_DAYS: "7",
+      },
+      dir,
+    );
+    expect(c.maxSubmissionBytes).toBe(1024 ** 3);
+    expect(c.maxContributorStagingBytes).toBe(3 * 1024 ** 3);
+    expect(c.maxMediaPerSubmission).toBe(50);
+    expect(c.draftRetentionDays).toBe(7);
+    expect(() => loadConfig({ ...base, DRAFT_RETENTION_DAYS: "0" }, dir)).toThrow(ConfigError);
+    expect(() => loadConfig({ ...base, MAX_MEDIA_PER_SUBMISSION: "0" }, dir)).toThrow(ConfigError);
+    expect(() => loadConfig({ ...base, MAX_SUBMISSION_BYTES: "lots" }, dir)).toThrow(ConfigError);
   });
 
   it("parses lists, sizes and a public URL with a path prefix", () => {

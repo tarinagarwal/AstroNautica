@@ -64,45 +64,48 @@ export class Utf8TextDecoder {
       if (this.fatal) throw new TypeError("invalid UTF-8");
       codes.push(0xfffd);
     };
+    // The WHATWG UTF-8 decoder: maximal subparts are replaced, an unexpected byte is processed again.
+    let cp = 0;
+    let needed = 0;
+    let seen = 0;
+    let lower = 0x80;
+    let upper = 0xbf;
     while (i < b.length) {
-      const c = b[i]!;
-      let need = 0;
-      let cp = 0;
-      let min = 0;
-      if (c < 0x80) {
-        codes.push(c);
+      const byte = b[i]!;
+      if (needed === 0) {
         i++;
+        if (byte <= 0x7f) codes.push(byte);
+        else if (byte >= 0xc2 && byte <= 0xdf) [needed, cp] = [1, byte & 0x1f];
+        else if (byte >= 0xe0 && byte <= 0xef) {
+          if (byte === 0xe0) lower = 0xa0;
+          if (byte === 0xed) upper = 0x9f;
+          [needed, cp] = [2, byte & 0x0f];
+        } else if (byte >= 0xf0 && byte <= 0xf4) {
+          if (byte === 0xf0) lower = 0x90;
+          if (byte === 0xf4) upper = 0x8f;
+          [needed, cp] = [3, byte & 0x07];
+        } else bad();
+      } else if (byte < lower || byte > upper) {
+        [cp, needed, seen, lower, upper] = [0, 0, 0, 0x80, 0xbf];
+        bad();
       } else {
-        if (c >= 0xc2 && c <= 0xdf) [need, cp, min] = [1, c & 0x1f, 0x80];
-        else if (c >= 0xe0 && c <= 0xef) [need, cp, min] = [2, c & 0x0f, 0x800];
-        else if (c >= 0xf0 && c <= 0xf4) [need, cp, min] = [3, c & 0x07, 0x10000];
-        else {
-          bad();
-          i++;
-          continue;
+        i++;
+        [lower, upper] = [0x80, 0xbf];
+        cp = (cp << 6) | (byte & 0x3f);
+        if (++seen === needed) {
+          if (cp >= 0x10000) {
+            const c = cp - 0x10000;
+            codes.push(0xd800 + (c >> 10), 0xdc00 + (c & 0x3ff));
+          } else codes.push(cp);
+          [cp, needed, seen] = [0, 0, 0];
         }
-        let j = 1;
-        for (; j <= need; j++) {
-          const n = b[i + j];
-          if (n === undefined || (n & 0xc0) !== 0x80) break;
-          cp = (cp << 6) | (n & 0x3f);
-        }
-        if (j <= need || cp < min || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff)) {
-          bad();
-          i += Math.max(1, j);
-          continue;
-        }
-        i += need + 1;
-        if (cp >= 0x10000) {
-          cp -= 0x10000;
-          codes.push(0xd800 + (cp >> 10), 0xdc00 + (cp & 0x3ff));
-        } else codes.push(cp);
       }
       if (codes.length >= 8192) {
         parts.push(String.fromCharCode(...codes));
         codes = [];
       }
     }
+    if (needed !== 0) bad();
     if (codes.length) parts.push(String.fromCharCode(...codes));
     return parts.join("");
   }

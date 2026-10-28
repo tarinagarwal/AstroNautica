@@ -9,10 +9,21 @@
 #   ./secrets/README.md             # create the secret files listed there
 #   docker compose up -d --build
 #
-# Networks:
-#   edge     - reachable from the internet through published ports (web, seedbox, ipfs swarm)
-#   backend  - internal only (no internet): postgres, api, relay, ipfs RPC, seedbox RPC
-#   egress   - outbound internet for the publisher (Arweave, EVM RPCs, other relays)
+# Networks (all but edge and egress are `internal: true`, i.e. no internet):
+#   edge     - reachable from the internet through published ports (web, seedbox, ipfs swarm, relay)
+#   backend  - postgres, migrate, api, publisher, relay, seedbox RPC, web (proxy to api/relay)
+#   ipfsrpc  - Kubo's RPC API (port 5001, full control of the node), shared ONLY by ipfs and the
+#              publisher. Kubo binds the RPC to its fixed address on this network (and 127.0.0.1 for
+#              the healthcheck), so it is not reachable from any other network either.
+#   ipfsgw   - Kubo's read-only gateway (8080), shared by ipfs and web (https://ipfs.<domain>)
+#   mediabus - the media worker, shared ONLY by media and the publisher: media has no internet, no
+#              database, no secrets
+#   egress   - outbound internet for the publisher (Arweave, EVM RPCs, other relays) and Tor
+#
+# Database users (least privilege, services/api migration 004 + postgres/init-users.sh):
+#   azaad      - database owner; used only by the one-shot `migrate` service
+#   api        - member of azaad_api_role
+#   publisher  - member of azaad_publisher_role
 #
 # Privacy (spec §12): no service logs client addresses. web and relay are also
 # run with the `none` log driver; the seedbox too, because its peers are readers.
@@ -32,6 +43,8 @@ x-no-logs: &no-logs
 
 secrets:
   postgres_password: { file: ./secrets/postgres_password }
+  postgres_api_password: { file: ./secrets/postgres_api_password }
+  postgres_publisher_password: { file: ./secrets/postgres_publisher_password }
   publisher_nostr_key: { file: ./secrets/publisher_nostr_key }
   publisher_x25519_key: { file: ./secrets/publisher_x25519_key }
   arweave_wallet: { file: ./secrets/arweave_wallet.json }
@@ -45,6 +58,15 @@ networks:
   edge:
   backend:
     internal: true
+  ipfsrpc:
+    internal: true
+    ipam:
+      config:
+        - subnet: ${IPFS_RPC_SUBNET:-172.31.250.0/29}
+  ipfsgw:
+    internal: true
+  mediabus:
+    internal: true
   egress:
 
 volumes:
@@ -52,7 +74,7 @@ volumes:
   staging: # encrypted submission blobs (api writes, publisher reads)
   seed: # published video files (complete/), shared with the seedbox
   seed-watch: # .torrent files the publisher drops for the seedbox to pick up
-  publisher-work: # decrypted, approved media while it is processed (deleted after publishing)
+  media-work: # decrypted, approved media while it is processed (publisher <-> media worker; deleted after publishing)
   relay-db:
   ipfs-data:
   seedbox-config:
@@ -69,7 +91,9 @@ services:
       POSTGRES_DB: azaadawaaz
       POSTGRES_USER: azaad
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
-    secrets: [postgres_password]
+    # init-users.sh (first start only; re-run by hand on existing databases, see README) creates the
+    # LOGIN users `api` and `publisher` from these secrets.
+    secrets: [postgres_password, postgres_api_password, postgres_publisher_password]
     command:
       [
         "postgres",
@@ -82,12 +106,41 @@ services:
         "-c",
         "password_encryption=scram-sha-256",
       ]
-    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init-users.sh:/docker-entrypoint-initdb.d/10-azaad-users.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U azaad -d azaadawaaz"]
       interval: 10s
       timeout: 5s
       retries: 10
+
+  # One-shot: applies services/api/migrations as the database owner, then exits. api and
+  # publisher start only after it succeeded and never hold DDL rights themselves.
+  migrate:
+    <<: *hardening
+    restart: "no"
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+    image: azaadawaaz/api:${RELEASE:-latest}
+    command: ["node", "dist/migrate.js"]
+    networks: [backend]
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    environment:
+      NODE_ENV: production
+      OWNER_PUBKEY: ${OWNER_PUBKEY:?set OWNER_PUBKEY in .env}
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: azaadawaaz
+      DATABASE_USER: azaad
+      DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
+      STAGING_DIR: /var/lib/azaadawaaz/staging
+    secrets: [postgres_password]
+    depends_on:
+      postgres: { condition: service_healthy }
 
   api:
     <<: *hardening
@@ -95,6 +148,7 @@ services:
       context: ../..
       dockerfile: services/api/Dockerfile
     image: azaadawaaz/api:${RELEASE:-latest}
+    # backend only: postgres and the relay. No route to Kubo's RPC (ipfsrpc) or the media worker.
     networks: [backend]
     read_only: true
     tmpfs: ["/tmp"]
@@ -111,33 +165,73 @@ services:
       DATABASE_HOST: postgres
       DATABASE_PORT: "5432"
       DATABASE_NAME: azaadawaaz
-      DATABASE_USER: azaad
-      DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
+      DATABASE_USER: api
+      DATABASE_PASSWORD_FILE: /run/secrets/postgres_api_password
+      # Migrations run in the one-shot `migrate` service; the api user has no DDL rights.
+      AUTO_MIGRATE: "false"
       STAGING_DIR: /var/lib/azaadawaaz/staging
+      # Staging quotas and draft expiry (services/api/README.md).
+      MAX_SUBMISSION_BYTES: ${MAX_SUBMISSION_BYTES:-4GB}
+      MAX_CONTRIBUTOR_STAGING_BYTES: ${MAX_CONTRIBUTOR_STAGING_BYTES:-8GB}
+      MAX_MEDIA_PER_SUBMISSION: ${MAX_MEDIA_PER_SUBMISSION:-200}
+      DRAFT_RETENTION_DAYS: ${DRAFT_RETENTION_DAYS:-30}
       # The api never sees client addresses (nginx strips them); do not add a
       # trust-proxy setting that would bring them back.
       TRUST_PROXY: "false"
-    secrets: [postgres_password]
+    secrets: [postgres_api_password]
     volumes: ["staging:/var/lib/azaadawaaz/staging"]
     depends_on:
       postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
 
-  # Media parsers are an attack surface (spec §12): no network at all beyond
-  # the internal one, read-only root, no capabilities, bounded resources.
-  # Media processing (services/media) is a library the publisher runs in-process, with ffmpeg and sharp sandboxed
-  # in child processes and worker threads; there is no separate media server. The media image builds the CLI for
-  # manual runs: docker compose run --rm --profile tools media image <in> <out>.
+  # Fixes the ownership of the volumes the unprivileged (uid 1000) publisher and media worker write
+  # to; Docker creates new named volumes root-owned. One-shot, no network.
+  volume-perms:
+    image: alpine:3.22
+    restart: "no"
+    network_mode: none
+    security_opt: ["no-new-privileges:true"]
+    command: ["sh", "-c", "chown 1000:1000 /v/media-work /v/seed /v/seed-watch && chmod 0700 /v/media-work"]
+    volumes:
+      - media-work:/v/media-work
+      - seed:/v/seed
+      - seed-watch:/v/seed-watch
+
+  # The media worker (services/media `node dist/server.js`, threat model §7): ffmpeg and sharp parse
+  # untrusted files here, never in the publisher. Only on `mediabus` (internal, shared with the
+  # publisher alone): no internet, no database, no secrets, no other service. Non-root, read-only root,
+  # no capabilities, bounded memory and processes. It sees only the shared media-work volume.
   media:
     <<: *hardening
-    profiles: [tools]
     build:
       context: ../..
       dockerfile: services/media/Dockerfile
     image: azaadawaaz/media:${RELEASE:-latest}
-    network_mode: none
+    user: "1000:1000"
+    networks: [mediabus]
     read_only: true
     tmpfs: ["/tmp:size=4g"]
     cap_drop: [ALL]
+    mem_limit: ${MEDIA_MEM_LIMIT:-4g}
+    pids_limit: 256
+    environment:
+      NODE_ENV: production
+      MEDIA_PORT: "3001"
+      MEDIA_SHARED_DIR: /var/lib/azaadawaaz/media
+    volumes: ["media-work:/var/lib/azaadawaaz/media"]
+    depends_on:
+      volume-perms: { condition: service_completed_successfully }
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   # The only holder of the publisher key (spec §12). Rotate by replacing the
   # secret file and `docker compose up -d publisher`.
@@ -147,7 +241,8 @@ services:
       context: ../..
       dockerfile: services/publisher/Dockerfile
     image: azaadawaaz/publisher:${RELEASE:-latest}
-    networks: [backend, egress]
+    # backend: postgres + relay; ipfsrpc: Kubo RPC; mediabus: the media worker; egress: the internet.
+    networks: [backend, ipfsrpc, mediabus, egress]
     read_only: true
     tmpfs: ["/tmp"]
     cap_drop: [ALL]
@@ -156,8 +251,8 @@ services:
       OWNER_PUBKEY: ${OWNER_PUBKEY:?set OWNER_PUBKEY in .env}
       DATABASE_HOST: postgres
       DATABASE_NAME: azaadawaaz
-      DATABASE_USER: azaad
-      DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
+      DATABASE_USER: publisher
+      DATABASE_PASSWORD_FILE: /run/secrets/postgres_publisher_password
       # Secrets (see services/publisher/README.md); files hold the bare value, no trailing newline needed.
       PUBLISHER_NSEC_FILE: /run/secrets/publisher_nostr_key
       PUBLISHER_X25519_PRIVATE_FILE: /run/secrets/publisher_x25519_key
@@ -176,12 +271,15 @@ services:
       IPFS_APIS: http://ipfs:5001${EXTRA_IPFS_API_URLS:+,${EXTRA_IPFS_API_URLS}}
       IPFS_GATEWAYS: ${PUBLIC_IPFS_GATEWAYS:?set PUBLIC_IPFS_GATEWAYS in .env}
       STAGING_DIR: /var/lib/azaadawaaz/staging
-      WORK_DIR: /var/lib/azaadawaaz/work
+      # Images and videos are processed by the media worker over mediabus; decrypted media is
+      # handed over through the shared media-work volume (also the publisher's work dir).
+      MEDIA_URL: http://media:3001
+      MEDIA_SHARED_DIR: /var/lib/azaadawaaz/media
       # Transmission seeds from /downloads/complete (the `seed` volume) and watches /watch (`seed-watch`).
       SEED_DIR: /var/lib/azaadawaaz/seed/complete
       SEEDBOX_WATCH_DIR: /var/lib/azaadawaaz/seed/watch
     secrets:
-      - postgres_password
+      - postgres_publisher_password
       - publisher_nostr_key
       - publisher_x25519_key
       - arweave_wallet
@@ -189,13 +287,16 @@ services:
       - pinning_services
     volumes:
       - staging:/var/lib/azaadawaaz/staging:ro
-      - publisher-work:/var/lib/azaadawaaz/work
+      - media-work:/var/lib/azaadawaaz/media
       - seed:/var/lib/azaadawaaz/seed
       - seed-watch:/var/lib/azaadawaaz/seed/watch
     depends_on:
       postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+      volume-perms: { condition: service_completed_successfully }
       relay: { condition: service_healthy }
       ipfs: { condition: service_healthy }
+      media: { condition: service_healthy }
 
   relay:
     <<: [*no-logs, *hardening]
@@ -204,6 +305,9 @@ services:
     image: azaadawaaz/relay:${RELEASE:-latest}
     networks: [backend, edge]
     environment:
+      # Write policy allowlist (infra/relay/policy.js): stories, lists and audit events only from the
+      # owner and the moderator/publisher keys the owner's own lists name; no deletions.
+      OWNER_PUBKEY: ${OWNER_PUBKEY:?set OWNER_PUBKEY in .env}
       POW_DIFFICULTY: ${POW_DIFFICULTY:-16}
       RATE_COMMENTS_PER_MINUTE: ${RATE_COMMENTS_PER_MINUTE:-10}
       RATE_REACTIONS_PER_MINUTE: ${RATE_REACTIONS_PER_MINUTE:-60}
@@ -223,11 +327,19 @@ services:
     <<: *hardening
     image: ipfs/kubo:v0.38.1
     command: ["daemon", "--migrate=true", "--enable-gc"]
-    networks: [backend, edge]
+    # Not on backend: the api must not reach Kubo's RPC. edge: swarm; ipfsgw: gateway for web;
+    # ipfsrpc: RPC for the publisher, on a fixed address the RPC listener is bound to.
+    networks:
+      edge: {}
+      ipfsgw: {}
+      ipfsrpc:
+        ipv4_address: ${IPFS_RPC_IP:-172.31.250.2}
     environment:
       IPFS_PROFILE: server
       IPFS_STORAGE_MAX: ${IPFS_STORAGE_MAX:-500GB}
       IPFS_PEERING: ${IPFS_PEERING:-}
+      # Addresses.API (ipfs/001-azaad-prod.sh): loopback for the healthcheck + the ipfsrpc address.
+      IPFS_API_LISTEN: /ip4/127.0.0.1/tcp/5001,/ip4/${IPFS_RPC_IP:-172.31.250.2}/tcp/5001
     ports:
       - "4001:4001/tcp"
       - "4001:4001/udp"
@@ -273,7 +385,8 @@ services:
       context: ../..
       dockerfile: infra/prod/web.Dockerfile
     image: azaadawaaz/web:${RELEASE:-latest}
-    networks: [edge, backend]
+    # backend: api + relay; ipfsgw: the read-only IPFS gateway (never the RPC).
+    networks: [edge, backend, ipfsgw]
     read_only: true
     tmpfs: ["/tmp", "/var/cache/nginx"]
     ports:
