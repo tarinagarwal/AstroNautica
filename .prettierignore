@@ -8,3 +8,6 @@ packages/contracts/cache
 packages/contracts/src/abi.ts
 packages/contracts/abi
 infra/**/data
+apps/web/test-results
+apps/web/playwright-report
+apps/android/android
