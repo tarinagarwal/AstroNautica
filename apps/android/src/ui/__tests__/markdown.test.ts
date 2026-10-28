@@ -12,7 +12,9 @@ describe("safe Markdown", () => {
   it("never interprets HTML, images or unsafe links", () => {
     const t = parseMarkdown('<script>alert(1)</script>\n\n![x](https://tracker.example/p.png) [bad](javascript:alert(1)) <img src=x onerror=alert(1)>');
     const json = JSON.stringify(t);
-    expect(json).not.toContain('"t":"link"');
+    // Image syntax never loads anything: it degrades to a plain link that opens only after the reader confirms.
+    expect(json).not.toMatch(/image|img"/);
+    expect(t[1]).toMatchObject({ children: [{ t: "text", text: "!" }, { t: "link", href: "https://tracker.example/p.png" }, expect.anything()] });
     expect(json).toContain("<script>alert(1)</script>");
     expect(json).not.toMatch(/"href":"javascript/);
     expect(parseMarkdown("[m](mailto:a@b.c)")[0]).toMatchObject({ children: [{ t: "link", href: "mailto:a@b.c" }] });
