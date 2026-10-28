@@ -1,0 +1,39 @@
+{
+  "name": "@azaadawaaz/publisher",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "start": "node dist/main.js",
+    "dev": "tsx watch src/main.ts"
+  },
+  "dependencies": {
+    "@azaadawaaz/contracts": "workspace:*",
+    "@azaadawaaz/core": "workspace:*",
+    "@azaadawaaz/schema": "workspace:*",
+    "arweave": "^2.1.0",
+    "create-torrent": "^6.1.3",
+    "kubo-rpc-client": "^7.1.0",
+    "magnet-uri": "^7.0.10",
+    "nostr-tools": "^2.25.2",
+    "pg": "^8.23.1",
+    "viem": "^2.57.12",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1",
+    "@types/ws": "^8.18.2",
+    "tsx": "^4.23.15"
+  }
+}
