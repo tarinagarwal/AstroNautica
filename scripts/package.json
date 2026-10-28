@@ -1,0 +1,20 @@
+{
+  "name": "@azaadawaaz/scripts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev-setup": "node dev-setup.mjs"
+  },
+  "dependencies": {
+    "@azaadawaaz/core": "workspace:*",
+    "@azaadawaaz/schema": "workspace:*",
+    "@ipld/car": "^5.4.7",
+    "@ipld/dag-pb": "^4.2.0",
+    "libsodium-wrappers-sumo": "0.7.15",
+    "multiformats": "^14.0.5",
+    "nostr-tools": "^2.25.2",
+    "viem": "^2.57.12",
+    "ws": "^8.22.0"
+  }
+}
