@@ -16,5 +16,9 @@
     "nostr-tools": "^2.25.2",
     "viem": "^2.57.12",
     "ws": "^8.22.0"
+  },
+  "exports": {
+    "./archive": "./lib/archive.mjs",
+    "./common": "./lib/common.mjs"
   }
 }

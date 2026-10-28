@@ -106,7 +106,13 @@ switch (name) {
     if (args["rotate-publisher"]) {
       const k = JSON.parse(readFileSync(args["rotate-publisher"], "utf8"));
       items = items.map((i) => (i.role === "publisher" && i.until === undefined ? { ...i, until: now } : i));
-      items.push({ role: "publisher", pubkey: k.nostr.pubkey, x25519: k.x25519.publicKey, evm: k.evm.address, from: now });
+      items.push({
+        role: "publisher",
+        pubkey: k.nostr.pubkey,
+        x25519: k.x25519.publicKey,
+        evm: k.evm.address,
+        from: now,
+      });
     } else if (args["owner-x25519"]) {
       items = items.filter((i) => i.role !== "owner");
       items.push({ role: "owner", pubkey: owner.pubkey, x25519: args["owner-x25519"], from: now });
@@ -115,7 +121,9 @@ switch (name) {
   case "releases":
     if (args.add) {
       const r = JSON.parse(readFileSync(args.add, "utf8"));
-      items = [...items.filter((i) => i.versionCode !== r.versionCode), r].sort((a, b) => b.versionCode - a.versionCode);
+      items = [...items.filter((i) => i.versionCode !== r.versionCode), r].sort(
+        (a, b) => b.versionCode - a.versionCode,
+      );
     } else fail("--add required");
     break;
   case "overrides": {
@@ -129,7 +137,8 @@ switch (name) {
 
 const event = createListEvent(name, items, secret, now);
 const check = buildEffectiveLists(owner.pubkey, [...current, event], { now });
-if (JSON.stringify(check[keyOf]) !== JSON.stringify(items)) fail("signed list failed validation; some items are malformed");
+if (JSON.stringify(check[keyOf]) !== JSON.stringify(items))
+  fail("signed list failed validation; some items are malformed");
 writeFileSync(args.out ?? `${name}.signed.json`, JSON.stringify([event], null, 2));
 console.log(`Signed ${name} (${items.length} entries) → ${args.out ?? `${name}.signed.json`}`);
 void rest;

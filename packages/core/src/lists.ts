@@ -57,7 +57,9 @@ export interface OnionEntry {
   address: string;
 }
 
-export interface ReleaseEntry {
+export type ReleaseEntry = AndroidRelease | WebRelease;
+
+export interface AndroidRelease {
   platform: "android";
   version: string;
   versionCode: number;
@@ -66,6 +68,15 @@ export interface ReleaseEntry {
   urls: string[];
   /** SHA-256 of the APK signing certificate. */
   signingCertSha256: string;
+  notes?: { en?: string; hi?: string };
+}
+
+/** A build of the static web app, published as an IPFS directory; mirrors serve the newest one. */
+export interface WebRelease {
+  platform: "web";
+  version: string;
+  versionCode: number;
+  cid: string;
   notes?: { en?: string; hi?: string };
 }
 
@@ -182,6 +193,8 @@ function isValidItem(name: ListName, i: any): boolean {
     case "onions":
       return isStr(i.address) && /^[a-z2-7]{56}\.onion$/.test(i.address);
     case "releases":
+      if (i.platform === "web")
+        return isStr(i.version) && Number.isInteger(i.versionCode) && /^b[a-z2-7]{20,}$/.test(i.cid);
       return (
         i.platform === "android" &&
         isStr(i.version) &&

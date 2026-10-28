@@ -1,0 +1,13 @@
+{
+  "name": "@azaadawaaz/mirror-sync",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/main.mjs"
+  },
+  "dependencies": {
+    "@azaadawaaz/core": "workspace:*",
+    "@azaadawaaz/scripts": "workspace:*"
+  }
+}
