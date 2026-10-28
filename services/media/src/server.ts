@@ -99,7 +99,9 @@ export function startServer() {
     }
   });
   server.requestTimeout = 0; // long videos
-  server.listen(PORT, HOST, () => process.stdout.write(JSON.stringify({ msg: "media worker listening", port: PORT }) + "\n"));
+  server.listen(PORT, HOST, () =>
+    process.stdout.write(JSON.stringify({ msg: "media worker listening", port: PORT }) + "\n"),
+  );
   return server;
 }
 

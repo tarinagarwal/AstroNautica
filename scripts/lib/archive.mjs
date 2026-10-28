@@ -467,7 +467,9 @@ export async function rebuildArchive(o) {
   // ---------- republish events ----------
   if (republishTo.length) {
     // The owner's lists first: a fresh relay learns moderators and publishers from them before it sees their events.
-    const ownerFirst = [...lists.sourceEvents].sort((a, b) => Number(b.pubkey === lists.owner) - Number(a.pubkey === lists.owner));
+    const ownerFirst = [...lists.sourceEvents].sort(
+      (a, b) => Number(b.pubkey === lists.owner) - Number(a.pubkey === lists.owner),
+    );
     const evs = [
       ...ownerFirst,
       ...latest.map((s) => s.event),

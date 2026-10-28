@@ -649,7 +649,8 @@ async function main() {
         }).catch(() => null));
       const ok = Boolean(b && verifyManifest(b, r, L).ok);
       let chainOk = true;
-      if (svc === "anvil") chainOk = (await receiptOnChain(cfg.chains[1], storyId, 1, PUBLISHER_EVM)).sha === ref.manifestSha256;
+      if (svc === "anvil")
+        chainOk = (await receiptOnChain(cfg.chains[1], storyId, 1, PUBLISHER_EVM)).sha === ref.manifestSha256;
       check(`with ${svc} stopped the story is listed, fetched and verified`, ok && chainOk);
     } finally {
       execFileSync("docker", [...compose, "start", svc], { stdio: "ignore" });

@@ -305,7 +305,9 @@ export class Pipeline {
         mkdirSync(dir, { recursive: true });
         const r = await this.processImageAt(src, dir);
         if (!hexEquals(r.originalSha256, m.sha256))
-          throw new PolicyError(`image ${m.sha256} still carried metadata after on-device stripping; refusing to publish it`);
+          throw new PolicyError(
+            `image ${m.sha256} still carried metadata after on-device stripping; refusing to publish it`,
+          );
         out.images[m.sha256] = {
           sha256: m.sha256,
           mime: r.mime,
@@ -365,7 +367,8 @@ export class Pipeline {
 
   /** Process one video into `dir`; all returned paths are relative to `dir`. */
   private async processVideoAt(src: string, dir: string) {
-    if (this.d.config.mediaUrl) return (await this.remoteMedia("video", src, dir)) as Awaited<ReturnType<typeof processVideo>>;
+    if (this.d.config.mediaUrl)
+      return (await this.remoteMedia("video", src, dir)) as Awaited<ReturnType<typeof processVideo>>;
     const r = await processVideo(src, dir);
     const rel = (p: string) => relative(dir, p);
     return {

@@ -256,7 +256,12 @@ describe("signed lists (two tiers)", () => {
       NOW - 5,
     );
     const good = "a".repeat(64);
-    const vouched = createListEvent("vouched", [{ publisher: old.pubkey, manifests: [good] }], owner.secretKey, NOW - 5);
+    const vouched = createListEvent(
+      "vouched",
+      [{ publisher: old.pubkey, manifests: [good] }],
+      owner.secretKey,
+      NOW - 5,
+    );
     const L = buildEffectiveLists(owner.pubkey, [keysList, vouched], { now: NOW });
     // Backdated event from the stolen retired key: rejected unless vouched.
     expect(wasPublisherAt(L, old.pubkey, NOW - 500, "b".repeat(64))).toBe(false);

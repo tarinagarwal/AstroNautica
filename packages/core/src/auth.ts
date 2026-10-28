@@ -165,14 +165,7 @@ function randomCode(): string {
 // ---- Moderation audit events (docs/architecture.md) ----
 
 export type AuditAction =
-  | "approve"
-  | "reject"
-  | "request_changes"
-  | "unlist"
-  | "hide"
-  | "mute"
-  | "claim"
-  | "revoke_contributor";
+  "approve" | "reject" | "request_changes" | "unlist" | "hide" | "mute" | "claim" | "revoke_contributor";
 
 /**
  * A moderator-signed audit event (kind 9737). `s` is sha256(submission id) so rejected submissions stay unidentifiable;

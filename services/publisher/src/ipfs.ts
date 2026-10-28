@@ -155,9 +155,7 @@ export async function nodeOrigins(apiUrls: string[]): Promise<string[]> {
   for (const url of apiUrls) {
     try {
       const id = await create({ url }).id();
-      out.push(
-        ...id.addresses.map((a) => a.toString()).filter(isPublicMultiaddr),
-      );
+      out.push(...id.addresses.map((a) => a.toString()).filter(isPublicMultiaddr));
     } catch {
       // a node being down only means fewer origins
     }

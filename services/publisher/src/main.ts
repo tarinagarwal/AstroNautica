@@ -20,7 +20,9 @@ async function main() {
     if (config.ipfsApis.length < 2) throw new Error("production requires at least two IPFS nodes (spec §6 step 3)");
     if (config.arweaveDevMine) throw new Error("ARWEAVE_DEV_MINE must be off in production");
     if (!config.mediaUrl)
-      throw new Error("production requires MEDIA_URL: media parsers must run in the isolated media container (threat model §7)");
+      throw new Error(
+        "production requires MEDIA_URL: media parsers must run in the isolated media container (threat model §7)",
+      );
   }
   mkdirSync(config.workDir, { recursive: true });
   mkdirSync(config.seedDir, { recursive: true });
