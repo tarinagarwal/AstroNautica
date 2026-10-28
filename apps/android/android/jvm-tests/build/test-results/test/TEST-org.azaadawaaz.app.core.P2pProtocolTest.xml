@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="org.azaadawaaz.app.core.P2pProtocolTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-28T01:52:29.614Z" hostname="vm" time="0.02">
+<testsuite name="org.azaadawaaz.app.core.P2pProtocolTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-28T01:54:12.210Z" hostname="vm" time="0.031">
   <properties/>
-  <testcase name="refusesTwoSendersAndDamagedBytes" classname="org.azaadawaaz.app.core.P2pProtocolTest" time="0.008"/>
-  <testcase name="transfersAFileWithHandshakeAndAck" classname="org.azaadawaaz.app.core.P2pProtocolTest" time="0.012"/>
+  <testcase name="refusesTwoSendersAndDamagedBytes" classname="org.azaadawaaz.app.core.P2pProtocolTest" time="0.015"/>
+  <testcase name="transfersAFileWithHandshakeAndAck" classname="org.azaadawaaz.app.core.P2pProtocolTest" time="0.016"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

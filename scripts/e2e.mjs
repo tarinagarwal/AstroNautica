@@ -731,13 +731,16 @@ async function main() {
   writeFileSync(join(work, "logs.json"), JSON.stringify(logs, null, 2));
 }
 
-async function receiptOnChain(chain, storyId, version) {
-  // eth_call receipt(bytes16,uint32): selector + abi-encoded args.
+async function receiptOnChain(chain, storyId, version, by) {
+  // eth_call receipt(bytes16,uint32,address): receipts are stored per writer (decision D19).
   const { keccak256, toBytes, encodeAbiParameters, decodeAbiParameters } = await import("viem");
-  const selector = keccak256(toBytes("receipt(bytes16,uint32)")).slice(0, 10);
+  const selector = keccak256(toBytes("receipt(bytes16,uint32,address)")).slice(0, 10);
   const data =
     selector +
-    encodeAbiParameters([{ type: "bytes16" }, { type: "uint32" }], [storyIdToBytes16(storyId), version]).slice(2);
+    encodeAbiParameters(
+      [{ type: "bytes16" }, { type: "uint32" }, { type: "address" }],
+      [storyIdToBytes16(storyId), version, by],
+    ).slice(2);
   const res = await fetch(chain.rpc, {
     method: "POST",
     headers: { "content-type": "application/json" },

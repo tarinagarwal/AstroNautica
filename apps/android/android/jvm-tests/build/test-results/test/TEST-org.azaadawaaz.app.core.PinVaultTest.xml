@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="org.azaadawaaz.app.core.PinVaultTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-28T01:52:29.636Z" hostname="vm" time="0.507">
+<testsuite name="org.azaadawaaz.app.core.PinVaultTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-28T01:54:12.244Z" hostname="vm" time="0.584">
   <properties/>
-  <testcase name="pinLayerLocksAndUnlocks" classname="org.azaadawaaz.app.core.PinVaultTest" time="0.506"/>
+  <testcase name="pinLayerLocksAndUnlocks" classname="org.azaadawaaz.app.core.PinVaultTest" time="0.581"/>
   <testcase name="wrongKeyOrTamperedBlobFails" classname="org.azaadawaaz.app.core.PinVaultTest" time="0.001"/>
   <testcase name="backoffSchedule" classname="org.azaadawaaz.app.core.PinVaultTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>

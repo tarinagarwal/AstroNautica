@@ -1,20 +1,20 @@
 {
-  "contentKey": "8f5ab4a7a4ced9d74507f0f88842880345cea3eaea0d6e9b4d8e1727c090eef5",
+  "contentKey": "f0c1ea284f90aed058d6e73fda4662cb9fe7a3ff7ab9c1a516b1ce9ee927888d",
   "stream": {
-    "chunks": ["80b32c6862fdd83c13dbd7c48bedd9429b2d3439ee340e272e1c0f9fb08f88750776fb5d7acab381f5f27262ab60bb83ed6b09ccd6d944678c"],
-    "header": "d0262b16d82e360e324c2f699759c889182a0d1f97e3e527",
+    "chunks": ["5ea96ba70c19c3e9d3b1ef2d229ab6b78cd6ab1423a881557aa1a6a644073ad3e373072097e398be6cc2b6d86848802c26dd46df7134598f9a"],
+    "header": "36eca82be20cc60189f1c14847a9501e0527c5e40f62cd93",
     "plaintext": "e0a49be0a58be0a49fe0a4be20e0a4b8e0a482e0a4a6e0a587e0a4b62066726f6d204b6f746c696e"
   },
-  "wrapped": "MOctuAl2FEUVLcejHiQMVolwDdoJaxPmPOqMT45HkiSSUTc_4R0tIp2wXkCYFmiqc87aPeIaxVYIZtjcxNFeZ7GnLbtUj-nOdP9fnjzMUUA",
+  "wrapped": "z9VEnhf7MVMwQNIpHYBWvqo3pzFrSDqighZNzvW1EVKygMJFABxOKvT7KTjduQNqGQgFRba_LYbx8EpTyavAExDXs9LpIPwh3x_-vLBHmNE",
   "x25519": {
-    "privateKey": "4f806c5e56e5bfd9e69aa72cf35bb6bdd669cbc6390134e18e99e27fb020236b",
-    "publicKey": "680e715324d57ed8dcef341b9dea2c8d1b1c9fef6070f27da3850bad15ca2267"
+    "privateKey": "56713c735f62b14b8f26ea2500d9f367e852a0257b3c76ce8b90f0b92fafa104",
+    "publicKey": "9260d9ed254625583ed40d57b094a644e2f2d540f47ea07a0327ba0dc29d8a72"
   },
   "fileStream": {
-    "firstChunkSha256": "427bd812fb4e10f91146e864b2741b74558ac133841f05f380d66bcf49958083",
+    "firstChunkSha256": "cc5d17dd9d2a236faf413a6d173b10d560b61ee2b75b70beb9f18d524754a26a",
     "chunkCount": 3,
     "plainSha256": "8f6b9d6a0ec228c33e083646f4b66cef486a2e39f80e5e2a258e4a0804dbe06d",
-    "header": "48d511c9d039ede9ead2b150ad3fdc3f205195f967a49df1",
-    "key": "0cc2f5a883ad400a1750b1017e8cb6b138c67cc3857b7aa8f703f0cb6198a4ca"
+    "header": "032341ce7466e66de63b659147909e5ae22f5aa9d28ec1e7",
+    "key": "1b75e05d30fca9039586aca9a4f27265a33956f5bf873c085a0029f0f911c2e7"
   }
 }

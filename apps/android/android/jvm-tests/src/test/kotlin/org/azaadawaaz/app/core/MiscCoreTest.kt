@@ -320,6 +320,9 @@ class WsBridgeTest {
             webSocket.send("echo:$text")
           }
           override fun onOpen(webSocket: WebSocket, response: Response) {}
+          override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+            webSocket.close(code, null)
+          }
         },
       ),
     )
@@ -341,8 +344,7 @@ class WsBridgeTest {
     assertTrue(ws.send("1", "hi"))
     assertEquals("msg:echo:hi", events.poll(5, TimeUnit.SECONDS))
     ws.close("1", 1000, "bye")
-    val last = events.poll(5, TimeUnit.SECONDS)
-    assertTrue(last == "close" || last!!.startsWith("error"))
+    assertEquals("close", events.poll(10, TimeUnit.SECONDS))
     server.shutdown()
   }
 
