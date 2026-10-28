@@ -18,5 +18,5 @@
       "react/*": ["./node_modules/@types/react/*"]
     }
   },
-  "include": ["src", "e2e", "vite.config.ts", "vitest.setup.ts"]
+  "include": ["src", "e2e", "e2e-real", "vite.config.ts", "vitest.setup.ts"]
 }

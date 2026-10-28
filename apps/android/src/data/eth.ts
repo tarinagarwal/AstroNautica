@@ -10,7 +10,7 @@ import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import type { ChainConfig } from "../config";
 import type { Http } from "../platform/types";
 
-type AbiItem = { type: string; name?: string; inputs?: { type: string }[] };
+type AbiItem = { type: string; name?: string; inputs?: readonly { type: string }[] };
 
 function signature(kind: "function" | "event", name: string): string {
   const item = (registryAbi as readonly AbiItem[]).find((i) => i.type === kind && i.name === name);

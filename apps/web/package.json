@@ -15,7 +15,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "pretest": "node scripts/gen-defaults.mjs",
     "test": "vitest run",
-    "e2e": "playwright test -c e2e/playwright.config.ts"
+    "e2e": "playwright test -c e2e/playwright.config.ts",
+    "e2e:real": "playwright test -c e2e-real/playwright.config.ts"
   },
   "dependencies": {
     "@azaadawaaz/contracts": "workspace:*",
