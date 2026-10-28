@@ -1,8 +1,10 @@
 /**
  * On-device metadata removal before anything is encrypted or uploaded (spec §1.1 principle 3, §4.1):
- * `@azaadawaaz/media-strip` removes Exif/XMP/IPTC and video location atoms losslessly; formats it can't process
- * (HEIC, AVIF, GIF, …) and rotated JPEGs are redrawn on a canvas and exported as JPEG first (a canvas export carries
- * no metadata). The output is re-read and only accepted when nothing identifying is left.
+ * `@azaadawaaz/media-strip` removes Exif/XMP/IPTC and video location atoms losslessly. Photos (JPEG, WebP, and
+ * formats it can't process such as HEIC/AVIF/GIF) are always redrawn on a canvas and re-encoded as JPEG first: a camera's
+ * quantization tables and encoder layout identify its make and model even with all metadata gone (security review #12,
+ * spec §4.1). PNG (screenshots, graphics) stays lossless. The output is re-read and only accepted when nothing
+ * identifying is left.
  */
 import {
   INFORMATIONAL_FINDINGS,
@@ -64,6 +66,14 @@ export async function sha256Of(bytes: Uint8Array): Promise<string> {
   return sha256Hex(bytes);
 }
 
+function safeOrientation(b: Uint8Array, mime: string): number {
+  try {
+    return readOrientation(b, mime);
+  } catch {
+    return 1;
+  }
+}
+
 export async function prepareMedia(
   file: Blob,
   limits: { maxImageBytes: number; maxVideoBytes: number },
@@ -85,9 +95,10 @@ export async function prepareMedia(
     if (!(e instanceof UnsupportedFormatError)) throw new MediaRejectedError("unsupported", [String(e)]);
   }
 
-  // Unsupported images (HEIC/AVIF/GIF/TIFF/BMP) and rotated photos: redraw as JPEG first.
-  const unsupported = isImage && !["image/jpeg", "image/png", "image/webp"].includes(sniffed);
-  if (isImage && (unsupported || readOrientation(original, sniffed) !== 1)) {
+  // Every image except PNG is redrawn as JPEG first: this applies orientation, decodes HEIC/AVIF/GIF where the
+  // browser can, and replaces camera-specific compression with the browser's own encoder.
+  const keepPng = sniffed === "image/png" && safeOrientation(original, sniffed) === 1;
+  if (isImage && !keepPng) {
     input = await toJpeg(file);
   }
 
