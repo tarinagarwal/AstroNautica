@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "17 2 * * *" # nightly: rebuild the archive from the real public networks
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r --filter "./packages/**" --filter "./services/**" build
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm typecheck
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: pnpm test
+
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - run: cd packages/contracts && forge fmt --check && forge test -vv && forge snapshot --check --no-match-test 'testFuzz|invariant'
+
+  e2e:
+    # Full pipeline on the local dev network, then the rebuild test from that network with an empty database
+    # (spec §11 "Rebuild test (MUST)").
+    runs-on: ubuntu-latest
+    needs: checks
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - uses: foundry-rs/foundry-toolchain@v1
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r --filter "./packages/**" --filter "./services/**" build
+      - run: docker compose -f infra/dev/docker-compose.yml up -d --wait
+      - run: node scripts/dev-setup.mjs
+      - run: node scripts/e2e.mjs
+
+  rebuild-public:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r --filter "./packages/**" build
+      - name: Rebuild from real public networks
+        env:
+          OWNER_PUBKEY: ${{ vars.OWNER_PUBKEY }}
+          PUBLIC_RELAYS: ${{ vars.PUBLIC_RELAYS }}
+          PUBLIC_GATEWAYS: ${{ vars.PUBLIC_GATEWAYS }}
+          CHAINS_JSON: ${{ vars.CHAINS_JSON }}
+        run: |
+          node scripts/rebuild-archive.mjs --owner "$OWNER_PUBKEY" --relays "$PUBLIC_RELAYS" \
+            --gateways "$PUBLIC_GATEWAYS" --arweave https://arweave.net --chains "$CHAINS_JSON" --out rebuilt

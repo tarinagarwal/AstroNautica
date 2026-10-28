@@ -39,3 +39,34 @@ pnpm workspaces, TypeScript (strict, ESM), Vitest for tests. Node 22.
 ## D9. Crypto libraries
 `@noble/curves` and `@noble/hashes` (audited, pure JS, work in browsers, React Native and Node) for Schnorr signatures
 and hashing; `nostr-tools` for NIP-19 encoding and Nostr event handling; `canonicalize` for RFC 8785 JCS.
+
+## D10. Arweave uploads with arweave-js directly
+Spec §6 step 4 offered a bundling service (ArDrive Turbo) or arweave-js. arweave-js works unchanged against ArLocal
+(tests) and mainnet, needs no third-party account, and uploads are made idempotent by looking up our own wallet's
+transactions by the `Content-SHA256` tag. Turbo can be added later behind the same `ArweaveStore` interface.
+
+## D11. Pinning through the standard IPFS Pinning Service API
+Filebase, Pinata and 4EVERLAND all implement it, so the provider is a configuration entry
+(`PINNING_SERVICES=[{name, endpoint, token}]`), swappable without code changes. Production refuses to start without
+one; development runs without (recorded as skipped in the job).
+
+## D12. Publisher step order: publish first, archive after
+Order: decrypt → checks → media → ipfs → pin → torrent → manifest → nostr (story is now `published`) → chain receipts
+→ arweave → storage receipt → finalize. Spec §5.1 allows Arweave and the chain receipt to finish after publication;
+chain receipts go first because they are fast and power the Verify badge.
+
+## D13. The publisher refuses images whose server re-check changes their bytes
+The approved image hash must be the published original. If the server's metadata check would change the bytes, the
+on-device stripping missed something; publishing a different file would break the approval, so the job fails and the
+owner is alerted instead.
+
+## D14. Mirrors take web releases from the signed releases list
+`releases` entries can be `platform: "web"` with the build's IPFS CID; the mirror kit exports the newest one.
+
+## D15. Rebuild uses chain receipts to find superseded versions
+Relays keep only the newest version of a replaceable story event. Every version's manifest CID is in the registry's
+`Published` logs, so the rebuild script reads them on every configured chain. IPFS content is fetched as CAR files
+from trustless gateways and every block is hash-checked, with the DAG walked for completeness.
+
+## D16. Owner key files use Argon2id
+`scripts/gen-owner-key.mjs` encrypts with libsodium `crypto_pwhash` (Argon2id, moderate limits) and secretbox.
