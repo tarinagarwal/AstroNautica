@@ -11,8 +11,8 @@ Updated after every phase. Newest first within each section.
 | 2 | `services/api` | **Done**: 78 integration tests on real Postgres; every transition, auth, invites, uploads, first-approval-wins |
 | 3 | `services/media`, `packages/media-strip`, `services/publisher`, E2E | **Done**: media-strip 55 tests, media 23 tests (real ffmpeg/exiftool media); publisher units; **`scripts/e2e.mjs` 62/62 checks** on the dev network (story published 4 s after approval; Arweave + receipts on both chains verified by a clean client; tamper → red; comments/PoW/hide; changes/reject; unlist + override; one relay/IPFS node/chain down → still readable; rebuild into an empty IPFS node; no IPs in logs) |
 | 4 | `apps/web` | **Done**: 53 unit + 8 mocked e2e + 1 real-stack browser journey (owner invite → contributor → moderator → published → reader verifies, comments, hide) |
-| 5 | `apps/android` | In progress (agent); Android SDK via Docker image `reactnativecommunity/react-native-android` (dl.google.com is blocked here) |
-| 6 | `infra`, runbooks, rebuild script, threat model | **Done** except final pass: dev/prod/mirror compose; relay allowlist policy (44 tests); prod network isolation (ipfsrpc, ipfsgw, mediabus), DB least-privilege users, media worker; mirror-sync exports signed web releases; threat model, runbooks, owner tooling, CI |
+| 5 | `apps/android` | **Done in code**: 98 Jest + 42 Kotlin tests, Metro + Hermes bundle; APK not built here (dl.google.com blocked by the environment's network policy) |
+| 6 | `infra`, runbooks, rebuild script, threat model | **Done** |
 
 ## Decisions taken without the owner (sensible defaults; see docs/decisions.md)
 - D7: receipts on Base **and** BSC (owner asked about BSC).
@@ -35,8 +35,7 @@ capped archive/mirror downloads; API quotas, DB replay store, no self-review, DB
 gateway CSP; owner tooling shows diffs.
 
 ## Next steps
-1. Android app (agent) integration and verification.
-2. Final full run: e2e, web real-stack journey, all package tests; handover.
+All phases done; see `docs/HANDOVER.md` for what's left for the owner (accounts, keys, APK build, production).
 
 ## Owner decisions pending (only the owner can make these)
 See the final handover; collected here as they come up:
