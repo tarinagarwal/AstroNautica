@@ -1,0 +1,31 @@
+{
+  "name": "@azaadawaaz/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "start": "node dist/main.js",
+    "dev": "tsx watch src/main.ts",
+    "migrate": "tsx src/migrate.ts",
+    "cleanup": "tsx src/cleanup.ts"
+  },
+  "dependencies": {
+    "@azaadawaaz/core": "workspace:*",
+    "@azaadawaaz/schema": "workspace:*",
+    "@fastify/cors": "^11.1.0",
+    "fastify": "^5.6.0",
+    "nostr-tools": "^2.17.0",
+    "pg": "^8.16.0",
+    "ws": "^8.22.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.15.0",
+    "@types/ws": "^8.18.2",
+    "tsx": "^4.20.0"
+  }
+}
